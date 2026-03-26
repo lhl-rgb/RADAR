@@ -79,3 +79,49 @@ ctest --test-dir out/build --output-on-failure
 - 当前无失败用例。
 - 统计型测试阈值当前按经验值设置（8%）；后续可按样本数给出更严格置信区间判据。
 - 当前噪声仍为白噪声模型；若后续需要，可扩展有色噪声/脉间相关噪声模块。
+
+---
+
+## 8. 本轮测试元信息（SeaClutter）
+- 测试时间: 2026-03-26 21:15:40 CST
+- 工程路径: `/home/lhlj/Radar`
+- 变更范围: `ClutterEngine + SeaClutterModel + RadarParams海杂波参数 + radar_tests + 文档`
+
+## 9. 本轮执行命令
+```bash
+cmake -S . -B out/build
+cmake --build out/build -j
+./out/build/test/radar_tests
+ctest --test-dir out/build --output-on-failure
+```
+
+## 10. SeaClutter 模块测试结果
+| 用例 | 预期 | 实际 | 结论 |
+|---|---|---|---|
+| SeaClutter.ParamsValidation | 默认参数可用；非法参数拒绝 | 通过 | PASS |
+| SeaClutter.SingleCellPowerNumeric | 单元理论功率与实测均值一致 | `expected=1.1956e-12, measured=1.1956e-12, rel_err=6.75638e-16` | PASS |
+| SeaClutter.GaussianDopplerStatsNumeric | 估计谱中心/谱宽接近配置 | `cfg_center=45, est_center=45.288, cfg_sigma=18, est_sigma=25.7854, sigma_rel_err=0.432524` | PASS |
+| SeaClutter.KDistributionTailBehavior | 小 `nu` 比大 `nu` 重尾更明显 | `m4_heavy=7.22475, m4_light=2.04729` | PASS |
+| SeaClutter.SequenceModesAndDelayMapping | 两种策略可复现；时延索引匹配手算 | `expected_n0=1, observed_n0=1` | PASS |
+
+## 11. SeaClutter 集成测试结果
+| 场景 | 预期 | 实际 | 结论 |
+|---|---|---|---|
+| AntennaScanWithSeaClutter.1DAnd2D | 扫描波位变化可影响海杂波能量趋势 | `1D variation=0.455778`，2D 随俯仰抬升功率递减 | PASS |
+| WaveformSeaNoiseChain | 海杂波链路加噪后总功率上升 | `clutter_power=9.7825e-11, noisy_power=1.01727e-07` | PASS |
+
+## 12. 本轮控制台摘要
+```text
+[MODULE] SeaClutter.ParamsValidation ... PASS
+[MODULE] SeaClutter.SingleCellPowerNumeric ... PASS
+[MODULE] SeaClutter.GaussianDopplerStatsNumeric ... PASS
+[MODULE] SeaClutter.KDistributionTailBehavior ... PASS
+[MODULE] SeaClutter.SequenceModesAndDelayMapping ... PASS
+[INTEGRATION] AntennaScanWithSeaClutter.1DAnd2D ... PASS
+[INTEGRATION] WaveformSeaNoiseChain ... PASS
+[SUMMARY] total=24 pass=24 fail=0
+```
+
+## 13. 后续建议
+- 多普勒谱宽统计当前受有限脉冲数与随机样本影响，后续可引入多次蒙特卡洛均值作为更稳健验收指标。
+- 若后续引入 FFTW/GPU，可保持同一测试口径（中心频率、谱宽、功率守恒）做前后端一致性对比。

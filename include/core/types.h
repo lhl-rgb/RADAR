@@ -121,6 +121,14 @@ enum class ClutterDistribution {
 };
 
 /**
+ * @brief 海杂波慢时间序列生成策略
+ */
+enum class SeaClutterSequenceMode {
+    DeterministicCellSeed,  ///< 每个散射单元按确定性种子独立生成。
+    SequencePoolRandomStart ///< 先生成长序列池，再按单元随机起点截取。
+};
+
+/**
  * @brief 目标运动模型
  */
 enum class MotionModel {

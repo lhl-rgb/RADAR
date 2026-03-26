@@ -131,6 +131,26 @@ const char* to_string(AntennaWeightType type) {
     return "Unknown";
 }
 
+/**
+ * @brief 海杂波慢时间序列策略转字符串
+ */
+const char* to_string(SeaClutterSequenceMode mode) {
+    switch (mode) {
+    case SeaClutterSequenceMode::DeterministicCellSeed:
+        return "DeterministicCellSeed";
+    case SeaClutterSequenceMode::SequencePoolRandomStart:
+        return "SequencePoolRandomStart";
+    }
+    return "Unknown";
+}
+
+/**
+ * @brief 判断有限值
+ */
+bool is_finite(Scalar value) {
+    return std::isfinite(value);
+}
+
 }  // namespace
 
 RadarParams::RadarParams()
@@ -154,6 +174,7 @@ RadarParams::RadarParams()
       min_range_m(1000.0),
       max_range_m(120000.0),
       radar_location{0.0, 0.0, 0.0},
+      sea_clutter(),
       wavelength_m(0.0),
       range_resolution_m(0.0),
       velocity_resolution_mps(0.0),
@@ -291,6 +312,45 @@ bool RadarParams::validate() const {
         }
     }
 
+    /**
+     * @brief 海杂波配置检查
+     */
+    if (!is_finite(sea_clutter.ground_range_min_m) ||
+        !is_finite(sea_clutter.ground_range_max_m) ||
+        !is_finite(sea_clutter.range_step_m) ||
+        !is_finite(sea_clutter.beam_az_width_deg) ||
+        !is_finite(sea_clutter.az_step_deg) ||
+        !is_finite(sea_clutter.k_shape_nu) ||
+        !is_finite(sea_clutter.doppler_center_hz) ||
+        !is_finite(sea_clutter.doppler_sigma_hz) ||
+        !is_finite(sea_clutter.morchin.a0_db) ||
+        !is_finite(sea_clutter.morchin.a_g) ||
+        !is_finite(sea_clutter.morchin.a_f) ||
+        !is_finite(sea_clutter.morchin.a_s) ||
+        !is_finite(sea_clutter.morchin.sea_state) ||
+        !is_finite(sea_clutter.morchin.sin_psi_floor)) {
+        return false;
+    }
+
+    if (sea_clutter.range_step_m <= 0.0 ||
+        sea_clutter.beam_az_width_deg <= 0.0 ||
+        sea_clutter.az_step_deg <= 0.0 ||
+        sea_clutter.k_shape_nu <= 0.0 ||
+        sea_clutter.doppler_sigma_hz <= 0.0 ||
+        sea_clutter.pool_length_factor <= 0 ||
+        sea_clutter.morchin.sin_psi_floor <= 0.0) {
+        return false;
+    }
+
+    const Scalar clutter_range_min =
+        (sea_clutter.ground_range_min_m < 0.0) ? min_range_m : sea_clutter.ground_range_min_m;
+    const Scalar clutter_range_max =
+        (sea_clutter.ground_range_max_m < 0.0) ? max_range_m : sea_clutter.ground_range_max_m;
+
+    if (clutter_range_min < 0.0 || clutter_range_max <= clutter_range_min) {
+        return false;
+    }
+
     return samples_per_pulse > 0;
 }
 
@@ -328,6 +388,24 @@ void RadarParams::print() const {
         << "  max_range_m: " << max_range_m << "\n"
         << "  radar_location: (" << radar_location.latitude << ", "
         << radar_location.longitude << ", " << radar_location.altitude << ")\n"
+        << "  sea_clutter.enabled: " << (sea_clutter.enabled ? "true" : "false") << "\n"
+        << "  sea_clutter.ground_range_min_m: " << sea_clutter.ground_range_min_m << "\n"
+        << "  sea_clutter.ground_range_max_m: " << sea_clutter.ground_range_max_m << "\n"
+        << "  sea_clutter.range_step_m: " << sea_clutter.range_step_m << "\n"
+        << "  sea_clutter.beam_az_width_deg: " << sea_clutter.beam_az_width_deg << "\n"
+        << "  sea_clutter.az_step_deg: " << sea_clutter.az_step_deg << "\n"
+        << "  sea_clutter.k_shape_nu: " << sea_clutter.k_shape_nu << "\n"
+        << "  sea_clutter.doppler_center_hz: " << sea_clutter.doppler_center_hz << "\n"
+        << "  sea_clutter.doppler_sigma_hz: " << sea_clutter.doppler_sigma_hz << "\n"
+        << "  sea_clutter.sequence_mode: " << to_string(sea_clutter.sequence_mode) << "\n"
+        << "  sea_clutter.seed: " << sea_clutter.seed << "\n"
+        << "  sea_clutter.pool_length_factor: " << sea_clutter.pool_length_factor << "\n"
+        << "  sea_clutter.morchin.a0_db: " << sea_clutter.morchin.a0_db << "\n"
+        << "  sea_clutter.morchin.a_g: " << sea_clutter.morchin.a_g << "\n"
+        << "  sea_clutter.morchin.a_f: " << sea_clutter.morchin.a_f << "\n"
+        << "  sea_clutter.morchin.a_s: " << sea_clutter.morchin.a_s << "\n"
+        << "  sea_clutter.morchin.sea_state: " << sea_clutter.morchin.sea_state << "\n"
+        << "  sea_clutter.morchin.sin_psi_floor: " << sea_clutter.morchin.sin_psi_floor << "\n"
         << "  wavelength_m: " << wavelength_m << "\n"
         << "  range_resolution_m: " << range_resolution_m << "\n"
         << "  velocity_resolution_mps: " << velocity_resolution_mps << "\n"
