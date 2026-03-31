@@ -1,4 +1,5 @@
 #include "core/waveform_generator.h"
+#include "core/radar_params.h"  // For backward-compatible constructor
 #include "core/math_utils.h"
 
 #include <algorithm>
@@ -31,11 +32,11 @@ std::vector<int> barker_code(PhaseCodeType code_type) {
 }
 
 //tp时间内的采样点数
-int default_tx_samples(const RadarParams& params) {
-    if (params.fs_hz <= 0.0 || params.pulse_width_s <= 0.0) {
-        return std::max(1, params.samples_per_pulse);
+int default_tx_samples(const RadarSystemParams& sys) {
+    if (sys.fs_hz <= 0.0 || sys.pulse_width_s <= 0.0) {
+        return std::max(1, sys.samples_per_pulse);
     }
-    return std::max(1, static_cast<int>(std::ceil(params.pulse_width_s * params.fs_hz)));
+    return std::max(1, static_cast<int>(std::ceil(sys.pulse_width_s * sys.fs_hz)));
 }
 //归一化功率
 void normalize_average_power(ComplexVec& waveform) {
@@ -84,15 +85,22 @@ Scalar invert_monotonic_linear(
 }
 }  // namespace
 
+WaveformGenerator::WaveformGenerator(const RadarSystemParams& sys,
+                                       const waveform::WaveformConfig& cfg) {
+    set_params(sys, cfg);
+}
+
 WaveformGenerator::WaveformGenerator(const RadarParams& params) {
     set_params(params);
 }
 
-void WaveformGenerator::set_params(const RadarParams& params) {
-    params_ = params;
-    const int num_samples = default_tx_samples(params_);
+void WaveformGenerator::set_params(const RadarSystemParams& sys,
+                                    const waveform::WaveformConfig& cfg) {
+    sys_ = sys;
+    cfg_ = cfg;
+    const int num_samples = default_tx_samples(sys_);
 
-    switch (params_.waveform_type) {
+    switch (cfg_.waveform_type) {
     case WaveformType::LFM:
         waveform_ = generate_lfm(num_samples);
         break;
@@ -102,7 +110,7 @@ void WaveformGenerator::set_params(const RadarParams& params) {
         break;
 
     case WaveformType::PHASE_CODED:
-        waveform_ = generate_phase_coded(num_samples, params_.phase_code_type);
+        waveform_ = generate_phase_coded(num_samples, cfg_.phase_code_type);
         break;
 
     case WaveformType::CW:
@@ -118,6 +126,41 @@ void WaveformGenerator::set_params(const RadarParams& params) {
     spectrum_.clear();
 }
 
+void WaveformGenerator::set_params(const RadarParams& params) {
+    // 转换为新的参数结构
+    RadarSystemParams sys;
+    sys.fc_hz = params.fc_hz;
+    sys.prf_hz = params.prf_hz;
+    sys.fs_hz = params.fs_hz;
+    sys.bw_hz = params.bw_hz;
+    sys.pulse_width_s = params.pulse_width_s;
+    sys.peak_power_w = params.peak_power_w;
+    sys.pulses_per_cpi = params.pulses_per_cpi;
+    sys.min_range_m = params.min_range_m;
+    sys.max_range_m = params.max_range_m;
+    sys.radar_location = params.radar_location;
+    sys.antenna_height_m = params.antenna_height_m;
+    sys.noise_figure_db = params.noise_figure_db;
+    sys.system_loss_db = params.system_loss_db;
+    sys.samples_per_pulse = params.samples_per_pulse;
+    sys.wavelength_m = params.wavelength_m;
+    sys.range_resolution_m = params.range_resolution_m;
+    sys.velocity_resolution_mps = params.velocity_resolution_mps;
+    sys.max_unambiguous_range_m = params.max_unambiguous_range_m;
+    sys.max_unambiguous_velocity_mps = params.max_unambiguous_velocity;
+    sys.noise_figure_linear = params.noise_figure_linear;
+    sys.system_loss_linear = params.system_loss_linear;
+    sys.compute_derived_params();
+
+    waveform::WaveformConfig cfg;
+    cfg.waveform_type = params.waveform_type;
+    cfg.phase_code_type = params.phase_code_type;
+    cfg.nlfm_window_type = params.nlfm_window_type;
+    cfg.polarization = params.polarization;
+
+    set_params(sys, cfg);
+}
+
 ComplexVec WaveformGenerator::generate_lfm(int num_samples) const {
     if (num_samples <= 0) {
         return {};
@@ -125,10 +168,10 @@ ComplexVec WaveformGenerator::generate_lfm(int num_samples) const {
 
     ComplexVec waveform(static_cast<std::size_t>(num_samples), Complex(1.0, 0.0));
 
-    const Scalar fs = std::max(params_.fs_hz, 1.0);
+    const Scalar fs = std::max(sys_.fs_hz, 1.0);
     const Scalar dt = 1.0 / fs;
-    const Scalar T  = std::max(params_.pulse_width_s, num_samples * dt);
-    const Scalar B  = math::clamp_nonnegative(params_.bw_hz);
+    const Scalar T  = std::max(sys_.pulse_width_s, num_samples * dt);
+    const Scalar B  = math::clamp_nonnegative(sys_.bw_hz);
 
     if (B <= EPSILON) {
         return waveform;
@@ -150,10 +193,10 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const
         return {};
     }
 
-    const Scalar fs = std::max(params_.fs_hz, 1.0);
+    const Scalar fs = std::max(sys_.fs_hz, 1.0);
     const Scalar dt = 1.0 / fs;
-    const Scalar T  = std::max(params_.pulse_width_s, num_samples * dt);
-    const Scalar B  = math::clamp_nonnegative(params_.bw_hz);
+    const Scalar T  = std::max(sys_.pulse_width_s, num_samples * dt);
+    const Scalar B  = math::clamp_nonnegative(sys_.bw_hz);
 
     if (B <= EPSILON) {
         // 无带宽时，退化成常数信号
@@ -169,15 +212,15 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const
     std::vector<Scalar> freq_axis(static_cast<std::size_t>(num_freq_samples), 0.0);
     std::vector<Scalar> weight(static_cast<std::size_t>(num_freq_samples), 1.0);
 
-    const auto window_weights = generate_window_weights(num_freq_samples, params_.nlfm_window_type);
-    // 若你想换窗，可以把 "hamming" 改成 params_.nlfm_window_type 之类
+    const auto window_weights = generate_window_weights(num_freq_samples, cfg_.nlfm_window_type);
+    // 若你想换窗，可以把 “hamming” 改成 cfg_.nlfm_window_type 之类
 
     for (int k = 0; k < num_freq_samples; ++k) {
         const Scalar alpha = static_cast<Scalar>(k) /
                              static_cast<Scalar>(num_freq_samples - 1);
         freq_axis[static_cast<std::size_t>(k)] = -0.5 * B + alpha * B;
 
-        // 这里建议用窗函数的平方作为“能量分布”权重，更常见一些
+        // 这里建议用窗函数的平方作为”能量分布”权重，更常见一些
         const Scalar w = math::clamp_nonnegative(window_weights[static_cast<std::size_t>(k)]);
         weight[static_cast<std::size_t>(k)] = w * w;
     }
@@ -286,7 +329,7 @@ ComplexVec WaveformGenerator::compute_spectrum(const ComplexVec& waveform) const
 
 
 Scalar WaveformGenerator::time_bandwidth_product() const {
-    return params_.pulse_width_s * params_.bw_hz;
+    return sys_.pulse_width_s * sys_.bw_hz;
 }
 
 

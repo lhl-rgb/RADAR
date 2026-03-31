@@ -1,6 +1,8 @@
 #pragma once
 #include "types.h"
 #include "radar_params.h"
+#include "radar_system_params.h"
+#include "waveform_config.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,10 +14,29 @@ namespace radar{
 class WaveformGenerator {
 public:
     WaveformGenerator() = default;
+
+    /**
+     * @brief 使用分离的参数构造
+     * @param sys 全局共享参数
+     * @param cfg 波形配置参数
+     */
+    WaveformGenerator(const RadarSystemParams& sys, const waveform::WaveformConfig& cfg);
+
+    /**
+     * @brief 使用 RadarParams 构造（兼容旧接口）
+     * @param params 雷达参数
+     * @deprecated 请使用 WaveformGenerator(sys, cfg)
+     */
     explicit WaveformGenerator(const RadarParams& params);
 
     /**
-     * @brief 设置雷达参数
+     * @brief 设置参数（分离版本）
+     */
+    void set_params(const RadarSystemParams& sys, const waveform::WaveformConfig& cfg);
+
+    /**
+     * @brief 设置雷达参数（兼容旧接口）
+     * @deprecated 请使用 set_params(sys, cfg)
      */
     void set_params(const RadarParams& params);
 
@@ -75,7 +96,8 @@ public:
     Scalar time_bandwidth_product() const;
 
 private:
-    RadarParams params_;
+    RadarSystemParams sys_;
+    waveform::WaveformConfig cfg_;
     ComplexVec waveform_;
     ComplexVec matched_filter_;
     ComplexVec spectrum_;
