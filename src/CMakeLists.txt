@@ -1,5 +1,6 @@
 set(RADAR_MODULES
   core
+  antenna
   clutter
   target
   verify
@@ -72,6 +73,7 @@ target_link_libraries(
   radar_modules
   INTERFACE
     radar::core
+    radar::antenna
     radar::clutter
     radar::target
     radar::verify
