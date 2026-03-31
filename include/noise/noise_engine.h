@@ -11,6 +11,8 @@
 #include <string>
 
 #include "core/radar_params.h"
+#include "core/radar_system_params.h"
+#include "noise/noise_config.h"
 
 namespace radar {
 
@@ -27,19 +29,47 @@ namespace radar {
 class NoiseEngine {
 public:
     NoiseEngine();
+
+    /**
+     * @brief 使用分离的参数构造
+     * @param sys 全局共享参数（提供 noise_figure_db 用于 ThermalKTB 模式）
+     * @param cfg 噪声配置参数
+     */
+    NoiseEngine(const RadarSystemParams& sys, const noise::NoiseConfig& cfg);
+
+    /**
+     * @brief 使用 NoiseParams 构造（兼容旧接口）
+     * @param params 噪声参数
+     * @deprecated 请使用 NoiseEngine(sys, cfg)
+     */
     explicit NoiseEngine(const NoiseParams& params);
 
     /**
-     * @brief 设置噪声参数
+     * @brief 设置噪声参数（分离版本）
+     * @param sys 全局共享参数
+     * @param cfg 噪声配置参数
+     * @return 成功返回 true
+     */
+    bool set_params(const RadarSystemParams& sys, const noise::NoiseConfig& cfg);
+
+    /**
+     * @brief 设置噪声参数（兼容旧接口）
      * @param params 输入参数
      * @return 成功返回 true；失败返回 false，且保持当前状态不变
+     * @deprecated 请使用 set_params(sys, cfg)
      */
     bool set_params(const NoiseParams& params);
 
     /**
-     * @brief 获取当前参数
+     * @brief 获取当前配置
      */
-    const NoiseParams& params() const { return params_; }
+    const noise::NoiseConfig& config() const { return cfg_; }
+
+    /**
+     * @brief 获取当前参数（兼容旧接口）
+     * @deprecated 请使用 config()
+     */
+    const NoiseParams& params() const { return legacy_params_; }
 
     /**
      * @brief 重置随机种子
@@ -91,11 +121,19 @@ private:
     static constexpr Scalar kBoltzmann = 1.380649e-23;
 
     /**
-     * @brief 根据参数计算复噪声功率
+     * @brief 根据参数计算复噪声功率（新版本）
      */
-    static bool compute_noise_power(const NoiseParams& params,
+    static bool compute_noise_power(const RadarSystemParams& sys,
+                                    const noise::NoiseConfig& cfg,
                                     Scalar& out_noise_power_w,
                                     std::string& error);
+
+    /**
+     * @brief 根据参数计算复噪声功率（兼容旧版本）
+     */
+    static bool compute_noise_power_legacy(const NoiseParams& params,
+                                           Scalar& out_noise_power_w,
+                                           std::string& error);
 
     /**
      * @brief 根据噪声功率构建缓存量
@@ -106,7 +144,8 @@ private:
                             std::string& error);
 
 private:
-    NoiseParams params_;
+    noise::NoiseConfig cfg_;        ///< 当前配置
+    NoiseParams legacy_params_;     ///< 兼容旧接口的参数缓存
 
     std::mt19937_64 rng_;
     std::normal_distribution<Scalar> standard_normal_;

@@ -6,19 +6,11 @@
 #pragma once
 
 #include "core/types.h"
+#include "core/radar_params.h"
 #include <cstdint>
 #include <string>
 
 namespace radar::noise {
-
-/**
- * @brief 噪声强度配置模式
- */
-enum class NoiseLevelMode {
-    ComplexSigma,  ///< 直接使用 sigma_complex（E{|n|^2}=sigma^2）
-    NoisePower,    ///< 直接使用 noise_power_w（W）
-    ThermalKTB     ///< 使用 noise_figure/system_temperature/noise_bandwidth 推导
-};
 
 /**
  * @brief 噪声配置参数
@@ -29,6 +21,7 @@ enum class NoiseLevelMode {
  * - mode = ThermalKTB：使用 k*T*B*F 推导噪声功率。
  *
  * 注意：noise_figure_db 从 RadarSystemParams 获取，不在此处定义。
+ * NoiseLevelMode 枚举定义在 radar 命名空间中。
  */
 struct NoiseConfig {
     NoiseLevelMode mode = NoiseLevelMode::ComplexSigma;  ///< 噪声强度配置模式
