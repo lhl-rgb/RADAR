@@ -16,6 +16,7 @@
 #include "clutter/sea_clutter_model.h"
 #include "core/antenna_set.h"
 #include "core/radar_params.h"
+#include "core/radar_system_params.h"
 #include "core/waveform_generator.h"
 #include "noise/noise_engine.h"
 #include "target/target_engine.h"
@@ -53,6 +54,7 @@ using radar::WaveformGenerator;
 using radar::WaveformType;
 using radar::WindowType;
 using radar::Vec3;
+using radar::RadarSystemParams;
 
 void require_true(bool condition, const std::string& message) {
     if (!condition) {
@@ -358,6 +360,69 @@ int main() {
         params.bw_hz = 2.0e6;
         params.compute_derived_params();
         require_true(!params.validate(), "fs < bw should be invalid for current model.");
+    });
+
+    // ==================== RadarSystemParams Tests ====================
+
+    run_case("MODULE", "RadarSystemParams.DefaultConstructionComputesDerived", [] {
+        RadarSystemParams params;
+
+        // Check derived parameters are computed
+        require_true(params.wavelength_m > 0.0, "wavelength_m should be positive.");
+        require_true(params.pri_s > 0.0, "pri_s should be positive.");
+        require_true(params.range_resolution_m > 0.0, "range_resolution_m should be positive.");
+        require_true(params.samples_per_pulse > 0, "samples_per_pulse should be positive.");
+
+        // Check wavelength calculation (C / fc)
+        require_true(approx_equal(params.wavelength_m, radar::C / 10.0e9, 1e-6),
+                     "wavelength should equal C/fc.");
+
+        // Check PRI calculation (1 / prf)
+        require_true(approx_equal(params.pri_s, 1.0 / 1600.0, 1e-9),
+                     "pri should equal 1/prf.");
+    });
+
+    run_case("MODULE", "RadarSystemParams.ValidateDetectsInvalidParams", [] {
+        RadarSystemParams params;
+        std::string error;
+
+        // Default params should be valid
+        require_true(params.validate(error), "default params should validate.");
+
+        // Invalid carrier frequency
+        params.fc_hz = -1.0;
+        require_true(!params.validate(error), "negative fc should be invalid.");
+        require_true(!error.empty(), "error message should not be empty.");
+
+        // Restore and test other invalid cases
+        params.fc_hz = 10.0e9;
+        params.pulse_width_s = 1.0;  // Exceeds PRI
+        require_true(!params.validate(error), "pulse_width > PRI should be invalid.");
+    });
+
+    run_case("MODULE", "RadarSystemParams.DerivedParamsFormulas", [] {
+        RadarSystemParams params;
+        params.fc_hz = 5.0e9;
+        params.bw_hz = 10.0e6;
+        params.prf_hz = 2000.0;
+        params.pulses_per_cpi = 64;
+        params.compute_derived_params();
+
+        // Wavelength = C / fc
+        require_true(approx_equal(params.wavelength_m, radar::C / 5.0e9, 1e-6),
+                     "wavelength formula check.");
+
+        // Range resolution = C / (2 * bw)
+        require_true(approx_equal(params.range_resolution_m, radar::C / (2.0 * 10.0e6), 1e-4),
+                     "range resolution formula check.");
+
+        // Max unambiguous range = C / (2 * prf)
+        require_true(approx_equal(params.max_unambiguous_range_m, radar::C / (2.0 * 2000.0), 1e-2),
+                     "max unambiguous range formula check.");
+
+        // Bandwidth-time product = bw * pulse_width
+        require_true(approx_equal(params.bandwidth_time_product, 10.0e6 * 20.0e-6, 1.0),
+                     "bandwidth-time product formula check.");
     });
 
     run_case("MODULE", "WaveformGenerator.LFMAndMatchedFilter", [] {
