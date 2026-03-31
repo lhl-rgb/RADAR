@@ -105,16 +105,6 @@ private:
                             Scalar& out_sigma_iq,
                             std::string& error);
 
-    /**
-     * @brief 判断正且有限
-     */
-    static bool is_positive_finite(Scalar value);
-
-    /**
-     * @brief dB 转线性
-     */
-    static Scalar db_to_linear(Scalar db_value);
-
 private:
     NoiseParams params_;
 

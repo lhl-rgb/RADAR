@@ -47,9 +47,8 @@ public:
     const SeaClutterModel& sea_model() const { return sea_model_; }
 
 private:
-    SeaClutterModel sea_model_;
-    std::string last_error_;
+    SeaClutterModel sea_model_; ///< 海杂波具体实现；后续可并列扩展陆杂波等模型。
+    std::string last_error_;    ///< 管理层统一错误出口，便于上层只读一个错误源。
 };
 
 }  // namespace radar
-

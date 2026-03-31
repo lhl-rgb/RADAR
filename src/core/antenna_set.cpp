@@ -4,6 +4,7 @@
  */
 
 #include "core/antenna_set.h"
+#include "core/math_utils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -15,24 +16,6 @@
 namespace radar {
 
 namespace {
-
-/**
- * @brief dB 转线性值
- * @param db_value dB 数值
- * @return 线性值
- */
-Scalar db_to_linear(Scalar db_value) {
-    return std::pow(10.0, db_value / 10.0);
-}
-
-/**
- * @brief 线性值转 dB
- * @param linear_value 线性值
- * @return dB 数值
- */
-Scalar linear_to_db(Scalar linear_value) {
-    return 10.0 * std::log10(std::max(linear_value, EPSILON));
-}
 
 /**
  * @brief 去除字符串首尾空白字符
@@ -95,8 +78,8 @@ void PhasedArrayAntenna::set_config(const PhasedArrayAntennaConfig& config) {
 
     config_.num_elements_az = std::max(config_.num_elements_az, 1);
     config_.num_elements_el = std::max(config_.num_elements_el, 1);
-    config_.spacing_az_lambda = std::max(config_.spacing_az_lambda, EPSILON);
-    config_.spacing_el_lambda = std::max(config_.spacing_el_lambda, EPSILON);
+    config_.spacing_az_lambda = math::clamp_positive_eps(config_.spacing_az_lambda);
+    config_.spacing_el_lambda = math::clamp_positive_eps(config_.spacing_el_lambda);
 
     refresh_internal_cache();
 }
@@ -114,7 +97,7 @@ void PhasedArrayAntenna::set_config(const PhasedArrayAntennaConfig& config) {
  * 阵因子幅度为 1，归一化功率为 1。
  */
 void PhasedArrayAntenna::refresh_internal_cache() {
-    peak_gain_linear_ = std::max(db_to_linear(config_.peak_gain_db), EPSILON);
+    peak_gain_linear_ = math::clamp_positive_eps(math::db_to_linear(config_.peak_gain_db));
     weights_az_ = make_weights(config_.num_elements_az, config_.weight_type_az);
     weights_el_ = make_weights(config_.num_elements_el, config_.weight_type_el);
 }
@@ -152,7 +135,7 @@ Scalar PhasedArrayAntenna::gain(Scalar target_az_deg, Scalar target_el_deg,
  */
 Scalar PhasedArrayAntenna::gain_db(Scalar target_az_deg, Scalar target_el_deg,
                                    Scalar beam_az_deg, Scalar beam_el_deg) const {
-    return linear_to_db(gain(target_az_deg, target_el_deg, beam_az_deg, beam_el_deg));
+    return math::linear_to_db(gain(target_az_deg, target_el_deg, beam_az_deg, beam_el_deg));
 }
 
 /**
@@ -197,7 +180,7 @@ bool PhasedArrayAntenna::is_target_in_beam(Scalar target_az_deg, Scalar target_e
                                            Scalar threshold_db) const {
     const Scalar p_norm =
         normalized_power(target_az_deg, target_el_deg, beam_az_deg, beam_el_deg);
-    const Scalar threshold_linear = db_to_linear(threshold_db);
+    const Scalar threshold_linear = math::db_to_linear(threshold_db);
     return p_norm >= threshold_linear;
 }
 
@@ -336,7 +319,7 @@ std::vector<Scalar> PhasedArrayAntenna::make_weights(int length,
     for (const Scalar w : weights) {
         sum_weights += w;
     }
-    sum_weights = std::max(sum_weights, EPSILON);
+    sum_weights = math::clamp_positive_eps(sum_weights);
 
     for (Scalar& w : weights) {
         w /= sum_weights;

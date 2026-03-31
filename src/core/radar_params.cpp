@@ -4,6 +4,7 @@
  */
 
 #include "core/radar_params.h"
+#include "core/math_utils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,15 +14,6 @@
 namespace radar {
 
 namespace {
-
-/**
- * @brief dB 转线性值
- * @param db_value dB 值
- * @return 线性值
- */
-Scalar db_to_linear(Scalar db_value) {
-    return std::pow(10.0, db_value / 10.0);
-}
 
 /**
  * @brief 极化类型转字符串
@@ -136,19 +128,12 @@ const char* to_string(AntennaWeightType type) {
  */
 const char* to_string(SeaClutterSequenceMode mode) {
     switch (mode) {
-    case SeaClutterSequenceMode::DeterministicCellSeed:
-        return "DeterministicCellSeed";
-    case SeaClutterSequenceMode::SequencePoolRandomStart:
-        return "SequencePoolRandomStart";
+    case SeaClutterSequenceMode::InTimeMode:
+        return "InTimeMode";
+    case SeaClutterSequenceMode::SequencePoolMode:
+        return "SequencePoolMode";
     }
     return "Unknown";
-}
-
-/**
- * @brief 判断有限值
- */
-bool is_finite(Scalar value) {
-    return std::isfinite(value);
 }
 
 }  // namespace
@@ -175,11 +160,12 @@ RadarParams::RadarParams()
       max_range_m(120000.0),
       radar_location{0.0, 0.0, 0.0},
       sea_clutter(),
+      target_params(),
       wavelength_m(0.0),
       range_resolution_m(0.0),
       velocity_resolution_mps(0.0),
       max_unambiguous_range_m(0.0),
-      max_velocity(0.0),
+      max_unambiguous_velocity(0.0),
       noise_figure_linear(0.0),
       system_loss_linear(0.0) {
     compute_derived_params();
@@ -204,10 +190,10 @@ RadarParams::RadarParams()
  * 再额外保留一个脉冲宽度，避免脉冲尾部被截断。
  */
 void RadarParams::compute_derived_params() {
-    const Scalar safe_fc = std::max(fc_hz, EPSILON);
-    const Scalar safe_bw = std::max(bw_hz, EPSILON);
-    const Scalar safe_prf = std::max(prf_hz, EPSILON);
-    const Scalar safe_fs = std::max(fs_hz, EPSILON);
+    const Scalar safe_fc = math::clamp_positive_eps(fc_hz);
+    const Scalar safe_bw = math::clamp_positive_eps(bw_hz);
+    const Scalar safe_prf = math::clamp_positive_eps(prf_hz);
+    const Scalar safe_fs = math::clamp_positive_eps(fs_hz);
     const Scalar safe_pulses_per_cpi =
         std::max<Scalar>(static_cast<Scalar>(pulses_per_cpi), 1.0);
 
@@ -215,14 +201,14 @@ void RadarParams::compute_derived_params() {
     range_resolution_m = C / (2.0 * safe_bw);
     velocity_resolution_mps = wavelength_m * safe_prf / (2.0 * safe_pulses_per_cpi);
     max_unambiguous_range_m = C / (2.0 * safe_prf);
-    max_velocity = wavelength_m * safe_prf / 4.0;
+    max_unambiguous_velocity = wavelength_m * safe_prf / 4.0;
 
-    noise_figure_linear = db_to_linear(noise_figure_db);
-    system_loss_linear = db_to_linear(system_loss_db);
+    noise_figure_linear = math::db_to_linear(noise_figure_db);
+    system_loss_linear = math::db_to_linear(system_loss_db);
 
-    const Scalar range_span_m = std::max<Scalar>(0.0, max_range_m - min_range_m);
+    const Scalar range_span_m = math::clamp_nonnegative(max_range_m - min_range_m);
     const Scalar fast_time_window_s =
-        (2.0 * range_span_m / C) + std::max<Scalar>(pulse_width_s, 0.0);
+        (2.0 * range_span_m / C) + math::clamp_nonnegative(pulse_width_s);
 
     samples_per_pulse =
         std::max(1, static_cast<int>(std::ceil(fast_time_window_s * safe_fs)));
@@ -253,6 +239,10 @@ bool RadarParams::save_to_json(const std::string& filepath) const {
  * 5. 相控阵配置合法性。
  */
 bool RadarParams::validate() const {
+    const auto is_vec3_finite = [](const Vec3& v) {
+        return std::isfinite(v.x()) && std::isfinite(v.y()) && std::isfinite(v.z());
+    };
+
     if (fc_hz <= 0.0 || bw_hz <= 0.0 || pulse_width_s <= 0.0 ||
         prf_hz <= 0.0 || peak_power_w <= 0.0) {
         return false;
@@ -315,20 +305,20 @@ bool RadarParams::validate() const {
     /**
      * @brief 海杂波配置检查
      */
-    if (!is_finite(sea_clutter.ground_range_min_m) ||
-        !is_finite(sea_clutter.ground_range_max_m) ||
-        !is_finite(sea_clutter.range_step_m) ||
-        !is_finite(sea_clutter.beam_az_width_deg) ||
-        !is_finite(sea_clutter.az_step_deg) ||
-        !is_finite(sea_clutter.k_shape_nu) ||
-        !is_finite(sea_clutter.doppler_center_hz) ||
-        !is_finite(sea_clutter.doppler_sigma_hz) ||
-        !is_finite(sea_clutter.morchin.a0_db) ||
-        !is_finite(sea_clutter.morchin.a_g) ||
-        !is_finite(sea_clutter.morchin.a_f) ||
-        !is_finite(sea_clutter.morchin.a_s) ||
-        !is_finite(sea_clutter.morchin.sea_state) ||
-        !is_finite(sea_clutter.morchin.sin_psi_floor)) {
+    if (!math::is_finite(sea_clutter.ground_range_min_m) ||
+        !math::is_finite(sea_clutter.ground_range_max_m) ||
+        !math::is_finite(sea_clutter.range_step_m) ||
+        !math::is_finite(sea_clutter.beam_az_width_deg) ||
+        !math::is_finite(sea_clutter.az_step_deg) ||
+        !math::is_finite(sea_clutter.k_shape_nu) ||
+        !math::is_finite(sea_clutter.doppler_center_hz) ||
+        !math::is_finite(sea_clutter.doppler_sigma_hz) ||
+        !math::is_finite(sea_clutter.morchin.a0_db) ||
+        !math::is_finite(sea_clutter.morchin.a_g) ||
+        !math::is_finite(sea_clutter.morchin.a_f) ||
+        !math::is_finite(sea_clutter.morchin.a_s) ||
+        !math::is_finite(sea_clutter.morchin.sea_state) ||
+        !math::is_finite(sea_clutter.morchin.sin_psi_floor)) {
         return false;
     }
 
@@ -342,12 +332,22 @@ bool RadarParams::validate() const {
         return false;
     }
 
+    const Scalar clutter_nyquist_hz = 0.5 * prf_hz;
+    if (sea_clutter.doppler_center_hz < -clutter_nyquist_hz ||
+        sea_clutter.doppler_center_hz >= clutter_nyquist_hz) {
+        return false;
+    }
+
     const Scalar clutter_range_min =
         (sea_clutter.ground_range_min_m < 0.0) ? min_range_m : sea_clutter.ground_range_min_m;
     const Scalar clutter_range_max =
         (sea_clutter.ground_range_max_m < 0.0) ? max_range_m : sea_clutter.ground_range_max_m;
 
     if (clutter_range_min < 0.0 || clutter_range_max <= clutter_range_min) {
+        return false;
+    }
+
+    if (!math::is_finite(target_params.beam_gate_threshold_db)) {
         return false;
     }
 
@@ -406,11 +406,21 @@ void RadarParams::print() const {
         << "  sea_clutter.morchin.a_s: " << sea_clutter.morchin.a_s << "\n"
         << "  sea_clutter.morchin.sea_state: " << sea_clutter.morchin.sea_state << "\n"
         << "  sea_clutter.morchin.sin_psi_floor: " << sea_clutter.morchin.sin_psi_floor << "\n"
+        << "  target_params.enabled: " << (target_params.enabled ? "true" : "false") << "\n"
+        << "  target_params.enable_beam_gain: " << (target_params.enable_beam_gain ? "true" : "false") << "\n"
+        << "  target_params.enable_two_way_propagation_loss: "
+        << (target_params.enable_two_way_propagation_loss ? "true" : "false") << "\n"
+        << "  target_params.enable_phase: " << (target_params.enable_phase ? "true" : "false") << "\n"
+        << "  target_params.enable_swerling: " << (target_params.enable_swerling ? "true" : "false") << "\n"
+        << "  target_params.seed: " << target_params.seed << "\n"
+        << "  target_params.beam_gate_threshold_db: " << target_params.beam_gate_threshold_db << "\n"
+        << "  target_params.skip_out_of_beam_targets: "
+        << (target_params.skip_out_of_beam_targets ? "true" : "false") << "\n"
         << "  wavelength_m: " << wavelength_m << "\n"
         << "  range_resolution_m: " << range_resolution_m << "\n"
         << "  velocity_resolution_mps: " << velocity_resolution_mps << "\n"
         << "  max_unambiguous_range_m: " << max_unambiguous_range_m << "\n"
-        << "  max_velocity: " << max_velocity << "\n"
+        << "  max_unambiguous_velocity: " << max_unambiguous_velocity << "\n"
         << "  noise_figure_linear: " << noise_figure_linear << "\n"
         << "  system_loss_linear: " << system_loss_linear << "\n";
 }

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <numeric>
 #include <stdexcept>
 #include <string>
@@ -17,6 +18,8 @@
 #include "core/radar_params.h"
 #include "core/waveform_generator.h"
 #include "noise/noise_engine.h"
+#include "target/target_engine.h"
+#include "target/target_manager.h"
 
 namespace {
 
@@ -39,9 +42,17 @@ using radar::Scalar;
 using radar::SeaClutterModel;
 using radar::SeaClutterParams;
 using radar::SeaClutterSequenceMode;
+using radar::SwerlingType;
+using radar::MotionModel;
+using radar::TargetEngine;
+using radar::TargetManager;
+using radar::TargetState;
+using radar::BeamView;
+using radar::TargetList;
 using radar::WaveformGenerator;
 using radar::WaveformType;
 using radar::WindowType;
+using radar::Vec3;
 
 void require_true(bool condition, const std::string& message) {
     if (!condition) {
@@ -248,11 +259,11 @@ Scalar normalized_fourth_moment(const ComplexVec& sequence) {
 Scalar compute_single_cell_expected_power(const RadarParams& params,
                                           const PhasedArrayAntenna& antenna,
                                           const AzEl& beam_pointing,
-                                          Scalar ground_range_min_m,
+                                          Scalar range_min_m,
                                           Scalar range_step_m,
                                           Scalar az_step_deg,
                                           const SeaClutterParams& clutter_params) {
-    const Scalar rg = ground_range_min_m + 0.5 * range_step_m;
+    const Scalar rg = range_min_m + 0.5 * range_step_m;
     const Scalar h = std::max(params.antenna_height_m, 0.0);
     const Scalar slant = std::sqrt(h * h + rg * rg);
     const Scalar grazing = std::atan2(h, rg);
@@ -656,6 +667,52 @@ int main() {
         require_true(!model.set_params(invalid), "invalid clutter params should be rejected.");
     });
 
+    run_case("MODULE", "SeaClutter.DopplerNyquistConstraint", [] {
+        RadarParams params;
+        params.prf_hz = 1200.0;
+        params.fs_hz = 4.0e6;
+        params.bw_hz = 1.0e6;
+        params.pulse_width_s = 1.5e-6;
+        params.min_range_m = 1000.0;
+        params.max_range_m = 1100.0;
+        params.pulses_per_cpi = 64;
+        params.antenna_height_m = 15.0;
+        params.compute_derived_params();
+        require_true(params.samples_per_pulse > 0, "nyquist test should produce valid samples.");
+
+        params.sea_clutter.ground_range_min_m = 1000.0;
+        params.sea_clutter.ground_range_max_m = 1100.0;
+        params.sea_clutter.range_step_m = 100.0;
+        params.sea_clutter.beam_az_width_deg = 0.1;
+        params.sea_clutter.az_step_deg = 0.1;
+        params.sea_clutter.k_shape_nu = 0.8;
+        params.sea_clutter.doppler_sigma_hz = 20.0;
+        params.sea_clutter.sequence_mode = SeaClutterSequenceMode::InTimeMode;
+        params.sea_clutter.seed = 5002;
+
+        params.sea_clutter.doppler_center_hz = 0.5 * params.prf_hz;
+        require_true(!params.validate(), "doppler_center_hz = +PRF/2 should fail validate().");
+
+        SeaClutterModel model;
+        require_true(model.set_params(params.sea_clutter),
+                     "set_params should not reject nyquist constraint without PRF context.");
+        PhasedArrayAntenna antenna(params.antenna_config);
+        CpiEcho invalid_echo;
+        require_true(!model.generate_cpi(params, antenna, AzEl(0.0, 0.0), 0,
+                                         ComplexVec{Complex(1.0, 0.0)}, invalid_echo),
+                     "generate_cpi should reject out-of-nyquist doppler center.");
+        require_true(model.last_error().find("[-prf_hz/2, prf_hz/2)") != std::string::npos,
+                     "generate_cpi nyquist error message should be explicit.");
+
+        SeaClutterParams valid_edge = params.sea_clutter;
+        valid_edge.doppler_center_hz = -0.5 * params.prf_hz;
+        require_true(model.set_params(valid_edge), "set_params should accept -PRF/2 edge.");
+        CpiEcho valid_echo;
+        require_true(model.generate_cpi(params, antenna, AzEl(0.0, 0.0), 1,
+                                        ComplexVec{Complex(1.0, 0.0)}, valid_echo),
+                     "generate_cpi should accept doppler_center_hz = -PRF/2.");
+    });
+
     run_case("MODULE", "SeaClutter.SingleCellPowerNumeric", [] {
         RadarParams params;
         params.fc_hz = 10.0e9;
@@ -683,7 +740,7 @@ int main() {
         clutter.doppler_center_hz = 0.0;
         clutter.doppler_sigma_hz = 25.0;
         clutter.k_shape_nu = 0.8;
-        clutter.sequence_mode = SeaClutterSequenceMode::DeterministicCellSeed;
+        clutter.sequence_mode = SeaClutterSequenceMode::InTimeMode;
         clutter.seed = 2026;
 
         SeaClutterModel model;
@@ -733,7 +790,7 @@ int main() {
         clutter.doppler_center_hz = 45.0;
         clutter.doppler_sigma_hz = 18.0;
         clutter.k_shape_nu = 100.0;
-        clutter.sequence_mode = SeaClutterSequenceMode::DeterministicCellSeed;
+        clutter.sequence_mode = SeaClutterSequenceMode::InTimeMode;
         clutter.seed = 901;
 
         SeaClutterModel model;
@@ -785,7 +842,7 @@ int main() {
             clutter.k_shape_nu = nu;
             clutter.doppler_center_hz = 0.0;
             clutter.doppler_sigma_hz = 20.0;
-            clutter.sequence_mode = SeaClutterSequenceMode::DeterministicCellSeed;
+            clutter.sequence_mode = SeaClutterSequenceMode::InTimeMode;
             clutter.seed = seed;
 
             SeaClutterModel model;
@@ -834,7 +891,7 @@ int main() {
         clutter.doppler_sigma_hz = 18.0;
         clutter.k_shape_nu = 0.9;
         clutter.seed = 4040;
-        clutter.sequence_mode = SeaClutterSequenceMode::DeterministicCellSeed;
+        clutter.sequence_mode = SeaClutterSequenceMode::InTimeMode;
 
         PhasedArrayAntenna antenna(params.antenna_config);
         SeaClutterModel model;
@@ -869,7 +926,7 @@ int main() {
         require_true(expected_n0 == static_cast<int>(observed_n0),
                      "nearest delay mapping index mismatch.");
 
-        clutter.sequence_mode = SeaClutterSequenceMode::SequencePoolRandomStart;
+        clutter.sequence_mode = SeaClutterSequenceMode::SequencePoolMode;
         clutter.pool_length_factor = 64;
         require_true(model.set_params(clutter), "pool mode set_params should succeed.");
 
@@ -899,6 +956,302 @@ int main() {
             }
         }
         require_true(!exactly_same, "different cells should use different random start segments.");
+    });
+
+    // ==================== TargetManager Tests ====================
+
+    run_case("MODULE", "TargetManager.StationaryTargetNoMotion", [] {
+        TargetManager mgr;
+        std::vector<TargetState> targets{
+            TargetState{1, Vec3(1000.0, 0.0, 0.0), Vec3::Zero(), Vec3::Zero(),
+                        MotionModel::Stationary, 5.0, SwerlingType::Swerling0, true}
+        };
+        mgr.set_targets(targets);
+
+        // 时间推进后位置应该不变
+        mgr.update_to_time(0.0);
+        require_true(mgr.get_current_targets()[0].position_m.x() == 1000.0,
+                     "stationary target position at t=0 should be initial position.");
+
+        mgr.update_to_time(10.0);
+        require_true(mgr.get_current_targets()[0].position_m.x() == 1000.0,
+                     "stationary target position at t=10 should still be initial position.");
+    });
+
+    run_case("MODULE", "TargetManager.ConstantVelocityMotion", [] {
+        TargetManager mgr;
+        const Scalar v = 50.0;  // 50 m/s
+        std::vector<TargetState> targets{
+            TargetState{2, Vec3(0.0, 0.0, 0.0), Vec3(v, 0.0, 0.0), Vec3::Zero(),
+                        MotionModel::ConstantVelocity, 5.0, SwerlingType::Swerling0, true}
+        };
+        mgr.set_targets(targets);
+
+        // t=0 位置应该是初始位置
+        mgr.update_to_time(0.0);
+        require_true(mgr.get_current_targets()[0].position_m.x() == 0.0,
+                     "CV target at t=0 should be at initial position.");
+
+        // t=10 位置应该是 0 + 50*10 = 500m
+        mgr.update_to_time(10.0);
+        require_true(mgr.get_current_targets()[0].position_m.x() == 500.0,
+                     "CV target at t=10 should have moved 500m.");
+
+        // t=20 位置应该是 1000m
+        mgr.update_to_time(20.0);
+        require_true(mgr.get_current_targets()[0].position_m.x() == 1000.0,
+                     "CV target at t=20 should have moved 1000m.");
+    });
+
+    run_case("MODULE", "TargetManager.ConstantAccelerationMotion", [] {
+        TargetManager mgr;
+        const Scalar v0 = 0.0;
+        const Scalar a = 10.0;  // 10 m/s^2
+        std::vector<TargetState> targets{
+            TargetState{3, Vec3(0.0, 0.0, 0.0), Vec3(v0, 0.0, 0.0), Vec3(a, 0.0, 0.0),
+                        MotionModel::ConstantAcceleration, 5.0, SwerlingType::Swerling0, true}
+        };
+        mgr.set_targets(targets);
+
+        // t=0: x = 0, v = 0
+        mgr.update_to_time(0.0);
+        require_true(mgr.get_current_targets()[0].position_m.x() == 0.0,
+                     "CA target at t=0 position should be 0.");
+        require_true(mgr.get_current_targets()[0].velocity_mps.x() == 0.0,
+                     "CA target at t=0 velocity should be 0.");
+
+        // t=10: x = 0.5 * 10 * 100 = 500m, v = 10 * 10 = 100 m/s
+        mgr.update_to_time(10.0);
+        require_true(mgr.get_current_targets()[0].position_m.x() == 500.0,
+                     "CA target at t=10 position should be 500m.");
+        require_true(mgr.get_current_targets()[0].velocity_mps.x() == 100.0,
+                     "CA target at t=10 velocity should be 100 m/s.");
+
+        // t=20: x = 0.5 * 10 * 400 = 2000m, v = 10 * 20 = 200 m/s
+        mgr.update_to_time(20.0);
+        require_true(mgr.get_current_targets()[0].position_m.x() == 2000.0,
+                     "CA target at t=20 position should be 2000m.");
+        require_true(mgr.get_current_targets()[0].velocity_mps.x() == 200.0,
+                     "CA target at t=20 velocity should be 200 m/s.");
+    });
+
+    run_case("MODULE", "TargetManager.MultipleTargets", [] {
+        TargetManager mgr;
+        std::vector<TargetState> targets{
+            TargetState{1, Vec3(1000.0, 0.0, 0.0), Vec3::Zero(), Vec3::Zero(),
+                        MotionModel::Stationary, 5.0, SwerlingType::Swerling0, true},
+            TargetState{2, Vec3(0.0, 0.0, 0.0), Vec3(50.0, 0.0, 0.0), Vec3::Zero(),
+                        MotionModel::ConstantVelocity, 5.0, SwerlingType::Swerling0, true},
+            TargetState{3, Vec3(0.0, 0.0, 0.0), Vec3::Zero(), Vec3(10.0, 0.0, 0.0),
+                        MotionModel::ConstantAcceleration, 5.0, SwerlingType::Swerling0, true}
+        };
+        mgr.set_targets(targets);
+
+        mgr.update_to_time(10.0);
+
+        const auto& current = mgr.get_current_targets();
+        require_true(current.size() == 3, "should have 3 targets.");
+
+        // 目标1：静止，位置不变
+        require_true(current[0].position_m.x() == 1000.0,
+                     "target 1 (stationary) position should not change.");
+
+        // 目标2：匀速，x = 0 + 50*10 = 500m
+        require_true(current[1].position_m.x() == 500.0,
+                     "target 2 (CV) should be at 500m.");
+
+        // 目标3：匀加速，x = 0.5 * 10 * 100 = 500m
+        require_true(current[2].position_m.x() == 500.0,
+                     "target 3 (CA) should be at 500m.");
+    });
+
+    // ==================== TargetEngine Tests ====================
+
+    run_case("MODULE", "TargetEngine.EmptyTargetsReturnZeroEcho", [] {
+        RadarParams params;
+        params.fc_hz = 10.0e9;
+        params.prf_hz = 1000.0;
+        params.fs_hz = 5.0e6;
+        params.bw_hz = 1.0e6;
+        params.pulse_width_s = 2.0e-6;
+        params.pulses_per_cpi = 16;
+        params.min_range_m = 1000.0;
+        params.max_range_m = 3000.0;
+        params.compute_derived_params();
+        require_true(params.validate(), "target empty test radar params should validate.");
+        WaveformGenerator wf(params);
+
+        TargetEngine engine;
+        CpiEcho echo;
+        require_true(engine.generate({}, BeamView{AzEl(0.0, 0.0), 0, nullptr},
+                                     params, wf.get_waveform(), echo),
+                     "empty target list should generate a valid zero echo.");
+        require_true(echo.pulses.size() == static_cast<std::size_t>(params.pulses_per_cpi),
+                     "pulse count mismatch.");
+        require_true(!echo.pulses.empty(), "echo should contain pulses.");
+        require_true(echo.pulses.front().size() == static_cast<std::size_t>(params.samples_per_pulse),
+                     "sample count mismatch.");
+        require_true(mean_power_cpi(echo) == 0.0, "empty target output should be all zeros.");
+    });
+
+    run_case("MODULE", "TargetEngine.GenerateFromRadarParamsTargets", [] {
+        RadarParams params;
+        params.fc_hz = 10.0e9;
+        params.prf_hz = 1000.0;
+        params.fs_hz = 6.0e6;
+        params.bw_hz = 1.0e6;
+        params.pulse_width_s = 2.0e-6;
+        params.pulses_per_cpi = 16;
+        params.min_range_m = 1000.0;
+        params.max_range_m = 3000.0;
+        params.target_params.enable_phase = false;
+        params.target_params.enable_two_way_propagation_loss = false;
+        params.target_params.enable_swerling = false;
+        params.compute_derived_params();
+        require_true(params.validate(), "radar params should validate.");
+        WaveformGenerator wf(params);
+
+        const int expected_bin = 20;
+        const Scalar range_bin_size_m = radar::C / (2.0 * params.fs_hz);
+        const Scalar target_range_m = params.min_range_m + expected_bin * range_bin_size_m;
+
+        TargetList targets = {
+            TargetState{99, Vec3(target_range_m, 0.0, 0.0), Vec3::Zero(), Vec3::Zero(),
+                        radar::MotionModel::Stationary, 10.0, SwerlingType::Swerling0, true}
+        };
+
+        TargetEngine engine;
+        CpiEcho echo;
+        require_true(engine.generate(targets,
+                                     BeamView{AzEl(0.0, 0.0), 0, nullptr},
+                                     params, wf.get_waveform(), echo),
+                     "generation with active target list should succeed.");
+
+        const std::size_t peak = dominant_range_bin(echo);
+        require_true(static_cast<int>(peak) == expected_bin,
+                     "dominant range bin should match configured inlined target.");
+    });
+
+    run_case("MODULE", "TargetEngine.SingleStationaryTargetRangeBin", [] {
+        RadarParams params;
+        params.fc_hz = 10.0e9;
+        params.prf_hz = 1000.0;
+        params.fs_hz = 6.0e6;
+        params.bw_hz = 1.0e6;
+        params.pulse_width_s = 2.0e-6;
+        params.pulses_per_cpi = 16;
+        params.min_range_m = 1000.0;
+        params.max_range_m = 3000.0;
+        params.target_params.enable_phase = false;
+        params.target_params.enable_two_way_propagation_loss = false;
+        params.target_params.enable_swerling = false;
+        params.compute_derived_params();
+        require_true(params.validate(), "stationary test radar params should validate.");
+        WaveformGenerator wf(params);
+
+        TargetEngine engine;
+
+        const int expected_bin = 20;
+        const Scalar range_bin_size_m = radar::C / (2.0 * params.fs_hz);
+        const Scalar target_range_m = params.min_range_m + expected_bin * range_bin_size_m;
+
+        TargetList targets{
+            TargetState{1, Vec3(target_range_m, 0.0, 0.0), Vec3::Zero(), Vec3::Zero(),
+                        radar::MotionModel::Stationary, 10.0, SwerlingType::Swerling0, true}
+        };
+
+        CpiEcho echo;
+        require_true(engine.generate(targets, BeamView{AzEl(0.0, 0.0), 0, nullptr},
+                                     params, wf.get_waveform(), echo),
+                     "stationary single-target generation should succeed.");
+        const std::size_t peak = dominant_range_bin(echo);
+        require_true(static_cast<int>(peak) == expected_bin,
+                     "dominant range bin should match theoretical delay mapping.");
+    });
+
+    run_case("MODULE", "TargetEngine.SingleMovingTargetDoppler", [] {
+        RadarParams params;
+        params.fc_hz = 10.0e9;
+        params.prf_hz = 1200.0;
+        params.fs_hz = 6.0e6;
+        params.bw_hz = 1.0e6;
+        params.pulse_width_s = 2.0e-6;
+        params.pulses_per_cpi = 128;
+        params.min_range_m = 1000.0;
+        params.max_range_m = 4000.0;
+        params.target_params.enable_phase = true;
+        params.target_params.enable_two_way_propagation_loss = false;
+        params.target_params.enable_swerling = false;
+        params.compute_derived_params();
+        require_true(params.validate(), "moving target radar params should validate.");
+        WaveformGenerator wf(params);
+
+        TargetEngine engine;
+
+        const Scalar vr_mps = 3.0;
+        TargetList targets{
+            TargetState{2, Vec3(2000.0, 0.0, 0.0), Vec3(vr_mps, 0.0, 0.0), Vec3::Zero(),
+                        radar::MotionModel::ConstantVelocity, 8.0, SwerlingType::Swerling0, true}
+        };
+
+        CpiEcho echo;
+        require_true(engine.generate(targets, BeamView{AzEl(0.0, 0.0), 3, nullptr},
+                                     params, wf.get_waveform(), echo),
+                     "moving single-target generation should succeed.");
+        const std::size_t peak = dominant_range_bin(echo);
+        const ComplexVec slow_time = extract_slow_time_sequence(echo, peak);
+        const SpectrumStats stats = estimate_spectrum_stats(slow_time, params.prf_hz);
+
+        const Scalar expected_fd_hz = 2.0 * vr_mps / params.wavelength_m;
+        const Scalar err_hz = std::abs(std::abs(stats.center_hz) - expected_fd_hz);
+        require_true(err_hz < 20.0, "estimated doppler center should match theoretical value.");
+    });
+
+    run_case("MODULE", "TargetEngine.SwerlingSlowFastBehavior", [] {
+        RadarParams params;
+        params.fc_hz = 10.0e9;
+        params.prf_hz = 1000.0;
+        params.fs_hz = 6.0e6;
+        params.bw_hz = 1.0e6;
+        params.pulse_width_s = 2.0e-6;
+        params.pulses_per_cpi = 64;
+        params.min_range_m = 1000.0;
+        params.max_range_m = 4000.0;
+        params.target_params.enable_phase = false;
+        params.target_params.enable_two_way_propagation_loss = false;
+        params.target_params.enable_swerling = true;
+        params.target_params.seed = 42;
+        params.compute_derived_params();
+        require_true(params.validate(), "swerling test radar params should validate.");
+        WaveformGenerator wf(params);
+
+        TargetEngine engine;
+
+        auto pulse_mag_span = [&](const SwerlingType model) {
+            TargetList targets{
+                TargetState{10, Vec3(1800.0, 0.0, 0.0), Vec3::Zero(), Vec3::Zero(),
+                            radar::MotionModel::Stationary, 5.0, model, true}
+            };
+            CpiEcho echo;
+            require_true(engine.generate(targets, BeamView{AzEl(0.0, 0.0), 5, nullptr},
+                                         params, wf.get_waveform(), echo),
+                         "swerling target generation should succeed.");
+            const std::size_t peak = dominant_range_bin(echo);
+            Scalar min_mag = std::numeric_limits<Scalar>::infinity();
+            Scalar max_mag = 0.0;
+            for (const auto& pulse : echo.pulses) {
+                const Scalar mag = std::abs(pulse[peak]);
+                min_mag = std::min(min_mag, mag);
+                max_mag = std::max(max_mag, mag);
+            }
+            return max_mag - min_mag;
+        };
+
+        const Scalar span_slow = pulse_mag_span(SwerlingType::Swerling1);
+        const Scalar span_fast = pulse_mag_span(SwerlingType::Swerling2);
+
+        require_true(span_slow < 1e-12, "Swerling I should be constant inside one CPI.");
+        require_true(span_fast > 1e-6, "Swerling II should fluctuate pulse-by-pulse.");
     });
 
     std::cout << "=== INTEGRATION TESTS ===\n";
@@ -1046,7 +1399,7 @@ int main() {
         p1.sea_clutter.doppler_center_hz = 0.0;
         p1.sea_clutter.doppler_sigma_hz = 20.0;
         p1.sea_clutter.k_shape_nu = 0.8;
-        p1.sea_clutter.sequence_mode = SeaClutterSequenceMode::DeterministicCellSeed;
+        p1.sea_clutter.sequence_mode = SeaClutterSequenceMode::InTimeMode;
         p1.sea_clutter.seed = 5001;
 
         AntennaScanModel scan_1d;
@@ -1142,7 +1495,7 @@ int main() {
         params.sea_clutter.k_shape_nu = 0.8;
         params.sea_clutter.doppler_center_hz = 0.0;
         params.sea_clutter.doppler_sigma_hz = 20.0;
-        params.sea_clutter.sequence_mode = SeaClutterSequenceMode::DeterministicCellSeed;
+        params.sea_clutter.sequence_mode = SeaClutterSequenceMode::InTimeMode;
         params.sea_clutter.seed = 7007;
 
         WaveformGenerator wf(params);

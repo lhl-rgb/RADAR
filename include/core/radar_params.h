@@ -8,6 +8,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "types.h"
 
@@ -94,9 +95,9 @@ struct MorchinParams {
  */
 struct SeaClutterParams {
     bool enabled = true;               ///< 是否启用海杂波。
-    Scalar ground_range_min_m = -1.0; ///< 地距下限（米）；-1 表示跟随 RadarParams::min_range_m。
-    Scalar ground_range_max_m = -1.0; ///< 地距上限（米）；-1 表示跟随 RadarParams::max_range_m。
-    Scalar range_step_m = 100.0;      ///< 地距网格步长（米）。
+    Scalar ground_range_min_m = -1.0;  ///< 地距下限（m）；-1 表示跟随 RadarParams::min_range_m。
+    Scalar ground_range_max_m = -1.0;  ///< 地距上限（m）；-1 表示跟随 RadarParams::max_range_m。
+    Scalar range_step_m = 100.0;       ///< 地距网格步长（m）。
     Scalar beam_az_width_deg = 3.0;   ///< 当前波位覆盖的方位角宽（度）。
     Scalar az_step_deg = 0.1;         ///< 方位网格步长（度）。
 
@@ -105,11 +106,25 @@ struct SeaClutterParams {
     Scalar doppler_sigma_hz = 20.0;   ///< 高斯多普勒谱标准差（Hz）。
 
     SeaClutterSequenceMode sequence_mode =
-        SeaClutterSequenceMode::DeterministicCellSeed;  ///< 慢时间序列生成策略。
+        SeaClutterSequenceMode::InTimeMode;  ///< 慢时间序列生成策略。
     uint64_t seed = 2026;          ///< 随机种子。
     int pool_length_factor = 32;   ///< 序列池长度倍数（pool_len = factor * pulses_per_cpi）。
 
     MorchinParams morchin;         ///< Morchin 模型参数。
+};
+
+/**
+ * @brief 目标回波生成参数
+ */
+struct TargetParams {
+    bool enabled = true;                         ///< 是否启用目标回波生成
+    bool enable_beam_gain = true;               ///< 是否启用天线方向增益
+    bool enable_two_way_propagation_loss = true;///< 是否启用双程传播损耗
+    bool enable_phase = true;                   ///< 是否启用传播相位
+    bool enable_swerling = true;                ///< 是否启用 Swerling 起伏
+    uint64_t seed = 20260330ULL;                ///< 随机种子
+    Scalar beam_gate_threshold_db = -20.0;      ///< 波束裁剪阈值（dB，相对峰值）
+    bool skip_out_of_beam_targets = false;      ///< 是否裁剪波束外目标
 };
 
 
@@ -156,6 +171,7 @@ struct RadarParams {
     Scalar max_range_m;       ///< 最大作用距离（米）。
     GeoCoord radar_location;  ///< 雷达地理位置（经纬高）。
     SeaClutterParams sea_clutter; ///< 海杂波参数配置。
+    TargetParams target_params;      ///< 目标回波参数配置。
     //=============================
     // 派生参数
     //=============================
@@ -163,7 +179,7 @@ struct RadarParams {
     Scalar range_resolution_m;       ///< 距离分辨率（米）。
     Scalar velocity_resolution_mps;  ///< 速度分辨率（m/s）。
     Scalar max_unambiguous_range_m;  ///< 最大非模糊距离（米）。
-    Scalar max_velocity;             ///< 最大非模糊速度（m/s）。
+    Scalar max_unambiguous_velocity;             ///< 最大非模糊速度（m/s）。
     Scalar noise_figure_linear;      ///< 噪声系数线性值。
     Scalar system_loss_linear;       ///< 系统损耗线性值。
     RadarParams();

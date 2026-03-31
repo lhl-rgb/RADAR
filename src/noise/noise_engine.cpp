@@ -4,6 +4,7 @@
  */
 
 #include "noise/noise_engine.h"
+#include "core/math_utils.h"
 
 #include <cmath>
 #include <limits>
@@ -16,9 +17,9 @@ NoiseEngine::NoiseEngine()
       standard_normal_(0.0, 1.0) {
     const bool ok = set_params(params_);
     if (!ok) {
-        noise_power_w_ = EPSILON;
-        sigma_complex_ = std::sqrt(EPSILON);
-        sigma_iq_ = std::sqrt(EPSILON / 2.0);
+        noise_power_w_ = math::clamp_positive_eps(EPSILON);
+        sigma_complex_ = std::sqrt(noise_power_w_);
+        sigma_iq_ = std::sqrt(math::safe_div(noise_power_w_, 2.0));
         last_error_ = "NoiseEngine default parameters are invalid.";
     }
 }
@@ -90,7 +91,7 @@ bool NoiseEngine::compute_noise_power(const NoiseParams& params,
                                       std::string& error) {
     switch (params.mode) {
     case NoiseLevelMode::ComplexSigma:
-        if (!is_positive_finite(params.sigma_complex)) {
+        if (!math::is_finite_positive(params.sigma_complex)) {
             error = "NoiseParams invalid: sigma_complex must be positive and finite.";
             return false;
         }
@@ -98,7 +99,7 @@ bool NoiseEngine::compute_noise_power(const NoiseParams& params,
         return true;
 
     case NoiseLevelMode::NoisePower:
-        if (!is_positive_finite(params.noise_power_w)) {
+        if (!math::is_finite_positive(params.noise_power_w)) {
             error = "NoiseParams invalid: noise_power_w must be positive and finite.";
             return false;
         }
@@ -106,11 +107,11 @@ bool NoiseEngine::compute_noise_power(const NoiseParams& params,
         return true;
 
     case NoiseLevelMode::ThermalKTB:
-        if (!is_positive_finite(params.system_temperature_k)) {
+        if (!math::is_finite_positive(params.system_temperature_k)) {
             error = "NoiseParams invalid: system_temperature_k must be positive and finite.";
             return false;
         }
-        if (!is_positive_finite(params.noise_bandwidth_hz)) {
+        if (!math::is_finite_positive(params.noise_bandwidth_hz)) {
             error = "NoiseParams invalid: noise_bandwidth_hz must be positive and finite.";
             return false;
         }
@@ -123,7 +124,7 @@ bool NoiseEngine::compute_noise_power(const NoiseParams& params,
             kBoltzmann *
             params.system_temperature_k *
             params.noise_bandwidth_hz *
-            db_to_linear(params.noise_figure_db);
+            math::db_to_linear(params.noise_figure_db);
         return true;
     }
 
@@ -135,29 +136,21 @@ bool NoiseEngine::build_cache(Scalar noise_power_w,
                               Scalar& out_sigma_complex,
                               Scalar& out_sigma_iq,
                               std::string& error) {
-    if (!is_positive_finite(noise_power_w) ||
+    if (!math::is_finite_positive(noise_power_w) ||
         noise_power_w <= std::numeric_limits<Scalar>::min()) {
         error = "NoiseParams invalid: resolved noise power must be positive and finite.";
         return false;
     }
 
     out_sigma_complex = std::sqrt(noise_power_w);
-    out_sigma_iq = std::sqrt(noise_power_w / 2.0);
+    out_sigma_iq = std::sqrt(math::safe_div(noise_power_w, 2.0));
 
-    if (!is_positive_finite(out_sigma_complex) || !is_positive_finite(out_sigma_iq)) {
+    if (!math::is_finite_positive(out_sigma_complex) || !math::is_finite_positive(out_sigma_iq)) {
         error = "NoiseParams invalid: resolved sigma is not finite.";
         return false;
     }
 
     return true;
-}
-
-bool NoiseEngine::is_positive_finite(Scalar value) {
-    return std::isfinite(value) && value > 0.0;
-}
-
-Scalar NoiseEngine::db_to_linear(Scalar db_value) {
-    return std::pow(10.0, db_value / 10.0);
 }
 
 }  // namespace radar

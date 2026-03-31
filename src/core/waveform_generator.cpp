@@ -1,4 +1,5 @@
 #include "core/waveform_generator.h"
+#include "core/math_utils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -127,7 +128,7 @@ ComplexVec WaveformGenerator::generate_lfm(int num_samples) const {
     const Scalar fs = std::max(params_.fs_hz, 1.0);
     const Scalar dt = 1.0 / fs;
     const Scalar T  = std::max(params_.pulse_width_s, num_samples * dt);
-    const Scalar B  = std::max(params_.bw_hz, 0.0);
+    const Scalar B  = math::clamp_nonnegative(params_.bw_hz);
 
     if (B <= EPSILON) {
         return waveform;
@@ -152,7 +153,7 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const
     const Scalar fs = std::max(params_.fs_hz, 1.0);
     const Scalar dt = 1.0 / fs;
     const Scalar T  = std::max(params_.pulse_width_s, num_samples * dt);
-    const Scalar B  = std::max(params_.bw_hz, 0.0);
+    const Scalar B  = math::clamp_nonnegative(params_.bw_hz);
 
     if (B <= EPSILON) {
         // 无带宽时，退化成常数信号
@@ -177,7 +178,7 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const
         freq_axis[static_cast<std::size_t>(k)] = -0.5 * B + alpha * B;
 
         // 这里建议用窗函数的平方作为“能量分布”权重，更常见一些
-        const Scalar w = std::max(window_weights[static_cast<std::size_t>(k)], 0.0);
+        const Scalar w = math::clamp_nonnegative(window_weights[static_cast<std::size_t>(k)]);
         weight[static_cast<std::size_t>(k)] = w * w;
     }
 
