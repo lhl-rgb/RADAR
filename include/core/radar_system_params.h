@@ -23,8 +23,8 @@ struct RadarSystemParams {
     // ===== 场景参数 =====
     Scalar min_range_m = 1000.0;        ///< 最小作用距离 (m)
     Scalar max_range_m = 120000.0;      ///< 最大作用距离 (m)
-    GeoCoord radar_location{0.0, 0.0, 0.0}; ///< 雷达地理位置
     Scalar antenna_height_m = 15.0;     ///< 天线安装高度 (m)
+    GeoCoord radar_location{0.0, 0.0, antenna_height_m}; ///< 雷达地理位置
 
     // ===== 系统损耗 =====
     Scalar noise_figure_db = 4.0;       ///< 接收机噪声系数 (dB)
