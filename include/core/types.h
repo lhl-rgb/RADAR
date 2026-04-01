@@ -46,6 +46,8 @@ struct GeoCoord {
   Scalar latitude;  ///< 纬度（度）。
   Scalar longitude; ///< 经度（度）。
   Scalar altitude;  ///< 海拔高度（米）。
+  GeoCoord() : latitude(0), longitude(0), altitude(0) {}
+  GeoCoord(Scalar lat, Scalar lon, Scalar alt) : latitude(lat), longitude(lon), altitude(alt) {}  
 };
 
 /**
@@ -103,27 +105,10 @@ struct ScanEcho {
   std::vector<CpiEcho> cpi_results; ///< 扫描内所有 CPI 结果。
 };
 
+
 //=============================
 // 枚举类型
 //=============================
-
-/**
- * @brief 杂波分布模型
- */
-enum class ClutterDistribution {
-  Rayleigh,     ///< 瑞利分布杂波。
-  Weibull,      ///< 韦伯分布杂波。
-  LogNormal,    ///< 对数正态分布杂波。
-  KDistribution ///< K 分布杂波。
-};
-
-/**
- * @brief 海杂波慢时间序列生成策略
- */
-enum class SeaClutterSequenceMode {
-  InTimeMode,  ///< 每个散射单元按确定性种子独立生成。
-  SequencePoolMode ///< 先生成长序列池，再按单元随机起点截取。
-};
 
 /**
  * @brief 目标运动模型
@@ -147,19 +132,22 @@ enum class SwerlingType {
 };
 
 /**
- * @brief 单目标状态（当前 CPI 起始时刻）
+ * @brief 杂波分布模型
  */
-struct TargetState {
-  uint64_t id = 0;/// 目标唯一标识符
-  Vec3 position_m = Vec3::Zero();// 位置（雷达本地直角坐标）
-  Vec3 velocity_mps = Vec3::Zero();// 速度
-  Vec3 acceleration_mps2 = Vec3::Zero();// 加速度
-  MotionModel motion_model = MotionModel::ConstantVelocity;// 运动模型
-  Scalar rcs_mean_m2 = 1.0;// 平均 RCS（平方米）
-  SwerlingType swerling = SwerlingType::Swerling0;// Swerling 起伏模型
-  bool enabled = true;// 是否启用该目标
+enum class ClutterDistribution {
+  Rayleigh,     ///< 瑞利分布杂波。
+  Weibull,      ///< 韦伯分布杂波。
+  LogNormal,    ///< 对数正态分布杂波。
+  KDistribution ///< K 分布杂波。
 };
-using TargetList = std::vector<TargetState>;
+
+/**
+ * @brief 海杂波序列生成策略
+ */
+enum class SeaClutterSequenceMode {
+  InTimeMode,  ///< 每个散射单元按确定性种子独立生成。
+  SequencePoolMode ///< 先生成长序列池，再按单元随机起点截取。
+};
 
 /**
  * @brief 极化类型
@@ -213,6 +201,7 @@ enum class WindowType {
 /**
  * @brief 相控阵模型类型
  */
+
 enum class PhasedArrayModelType {
   ULA_1D, ///< 一维相扫：均匀线阵
   UPA_2D  ///< 二维相扫：均匀平面阵
@@ -224,5 +213,57 @@ enum class AntennaWeightType {
   Uniform, ///< 均匀加权
   Hamming  ///< Hamming 加权
 };
+
+/**
+ * @brief 噪声电平模式
+ */
+enum class NoiseLevelMode {
+  ComplexSigma,   ///< 使用复噪声 RMS sigma 作为输入
+  NoisePower,     ///< 使用噪声功率（W）作为输入
+  ThermalKTB      ///< 使用 k*T*B*F 推导噪声功率
+};
+
+
+//=============================
+// 目标参数结构体
+//=============================
+/**
+ * @brief 单目标状态（当前 CPI 起始时刻）
+ */
+struct TargetState {
+  uint64_t id = 0;/// 目标唯一标识符
+  Vec3 position_m = Vec3::Zero();// 位置（雷达本地直角坐标）
+  Vec3 velocity_mps = Vec3::Zero();// 速度
+  Vec3 acceleration_mps2 = Vec3::Zero();// 加速度
+  MotionModel motion_model = MotionModel::ConstantVelocity;// 运动模型
+  Scalar rcs_mean_m2 = 1.0;// 平均 RCS（平方米）
+  SwerlingType swerling = SwerlingType::Swerling0;// Swerling 起伏模型
+  bool enabled = true;// 是否启用该目标
+};
+using TargetList = std::vector<TargetState>;// 目标状态
+
+/**
+ * @brief 目标在某一时刻的快照（位置、速度、增益等）
+ */
+struct TargetSnapshot {
+    Scalar slow_time_s = 0.0;
+    Vec3 position_m = Vec3::Zero();
+    Vec3 velocity_mps = Vec3::Zero();
+    Vec3 acceleration_mps2 = Vec3::Zero();
+    Scalar range_m = 0.0;
+    Scalar radial_velocity_mps = 0.0;
+    Scalar radial_acceleration_mps2 = 0.0;
+    Scalar gain_linear = 1.0;
+    Scalar rcs_m2 = 1.0;
+};
+
+/**
+ * @brief 目标轨迹（包含多个快照）
+ */
+struct TargetTrajectory {
+    uint64_t target_id = 0;
+    std::vector<TargetSnapshot> snapshots;
+};
+using TrajectoryBatch = std::vector<TargetTrajectory>;// 目标轨迹批次
 
 } // namespace radar
