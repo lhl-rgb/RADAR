@@ -1,27 +1,23 @@
 {
-    "version": 8,
-    "configurePresets": [
-        {
-            "name": "radar",
-            "displayName": "Radar Debug",
-            "description": "使用系统编译器与系统 CUDA 的 Debug 配置",
-            "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                "RADAR_ENABLE_CUDA": "ON",
-                "RADAR_BUILD_TESTS": "OFF",
-                "CUDAToolkit_ROOT": "/usr",
-                "CMAKE_CUDA_COMPILER": "/usr/bin/nvcc"
-            }
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "radar",
-            "configurePreset": "radar",
-            "jobs": 0
-        }
-    ]
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Config",
+      "description": "Default build configuration",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RADAR_BUILD_TESTS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default-build",
+      "displayName": "Default Build",
+      "configurePreset": "default"
+    }
+  ]
 }
