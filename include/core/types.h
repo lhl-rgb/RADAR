@@ -72,6 +72,9 @@ struct BeamPoint {
   BeamPoint(Scalar az, Scalar el) : azimuth_deg(az), elevation_deg(el) {}
 };
 
+using BeamTable = std::vector<BeamPoint>; ///< 波位表类型。
+
+
 /**
  * @brief 距离-多普勒单元索引
  */
@@ -107,140 +110,145 @@ struct ScanEcho {
 
 
 //=============================
-// 枚举类型
+// 枚举类型（按通用性排序：基础枚举在前，领域特定枚举在后）
 //=============================
-
-/**
- * @brief 目标运动模型
- */
-enum class MotionModel {
-  Stationary,           ///< 静止目标。
-  ConstantVelocity,     ///< 匀速目标。
-  ConstantAcceleration, ///< 匀加速目标。
-  VariableAcceleration  ///< 变加速目标。
-};
-
-/**
- * @brief Swerling 起伏模型
- */
-enum class SwerlingType {
-  Swerling0 = 0, ///< 不起伏。
-  Swerling1 = 1, ///< 慢起伏，RCS 指数分布。
-  Swerling2 = 2, ///< 快起伏，RCS 指数分布。
-  Swerling3 = 3, ///< 慢起伏，RCS 卡方分布（4 自由度）。
-  Swerling4 = 4  ///< 快起伏，RCS 卡方分布（4 自由度）。
-};
-
-/**
- * @brief 杂波分布模型
- */
-enum class ClutterDistribution {
-  Rayleigh,     ///< 瑞利分布杂波。
-  Weibull,      ///< 韦伯分布杂波。
-  LogNormal,    ///< 对数正态分布杂波。
-  KDistribution ///< K 分布杂波。
-};
-
-/**
- * @brief 海杂波序列生成策略
- */
-enum class SeaClutterSequenceMode {
-  InTimeMode,  ///< 每个散射单元按确定性种子独立生成。
-  SequencePoolMode ///< 先生成长序列池，再按单元随机起点截取。
-};
 
 /**
  * @brief 极化类型
  */
 enum class PolarizationType {
-  HH, ///< 发射/接收均为水平极化。
-  VV  ///< 发射/接收均为垂直极化。
-};
-
-/**
- * @brief 天线方向图类型
- */
-enum class AntennaPatternType {
-  SincSquared, ///< Sinc^2 主瓣近似。
-  Gaussian,    ///< 高斯主瓣近似。
-  CosinePower  ///< 余弦指数主瓣近似。
+    HH,     ///< 发射/接收均为水平极化
+    VV      ///< 发射/接收均为垂直极化
 };
 
 /**
  * @brief 发射波形类型
  */
 enum class WaveformType {
-  LFM,         ///< 线性调频。
-  NLFM,        ///< 非线性调频。
-  PHASE_CODED, ///< 相位编码。
-  CW           ///< 连续波。
+    LFM,          ///< 线性调频
+    NLFM,         ///< 非线性调频
+    PHASE_CODED,  ///< 相位编码
+    CW            ///< 连续波
 };
 
 /**
  * @brief 相位编码类型
  */
 enum class PhaseCodeType {
-  Barker2,  ///< Barker 长度 2。
-  Barker3,  ///< Barker 长度 3。
-  Barker4,  ///< Barker 长度 4。
-  Barker5,  ///< Barker 长度 5。
-  Barker7,  ///< Barker 长度 7。
-  Barker11, ///< Barker 长度 11。
-  Barker13  ///< Barker 长度 13。
+    Barker2,   ///< Barker 码长度 2
+    Barker3,   ///< Barker 码长度 3
+    Barker4,   ///< Barker 码长度 4
+    Barker5,   ///< Barker 码长度 5
+    Barker7,   ///< Barker 码长度 7
+    Barker11,  ///< Barker 码长度 11
+    Barker13   ///< Barker 码长度 13
 };
 
 /**
  * @brief 窗函数类型
  */
 enum class WindowType {
-  Rectangular, ///< 矩形窗。
-  Hann,        ///< Hann 窗。
-  Hamming,     ///< Hamming 窗。
-  Blackman     ///< Blackman 窗。
+    Rectangular,  ///< 矩形窗
+    Hann,         ///< Hann 窗
+    Hamming,      ///< Hamming 窗
+    Blackman      ///< Blackman 窗
 };
+
+/**
+ * @brief 天线方向图类型
+ */
+enum class AntennaPatternType {
+    SincSquared,  ///< Sinc^2 主瓣近似
+    Gaussian,     ///< 高斯主瓣近似
+    CosinePower   ///< 余弦指数主瓣近似
+};
+
 /**
  * @brief 相控阵模型类型
  */
-
 enum class PhasedArrayModelType {
-  ULA_1D, ///< 一维相扫：均匀线阵
-  UPA_2D  ///< 二维相扫：均匀平面阵
+    ULA_1D,  ///< 一维相扫：均匀线阵
+    UPA_2D   ///< 二维相扫：均匀平面阵
 };
+
 /**
  * @brief 阵元加权类型
  */
 enum class AntennaWeightType {
-  Uniform, ///< 均匀加权
-  Hamming  ///< Hamming 加权
+    Uniform,  ///< 均匀加权
+    Hamming   ///< Hamming 加权
 };
 
 /**
  * @brief 噪声电平模式
  */
 enum class NoiseLevelMode {
-  ComplexSigma,   ///< 使用复噪声 RMS sigma 作为输入
-  NoisePower,     ///< 使用噪声功率（W）作为输入
-  ThermalKTB      ///< 使用 k*T*B*F 推导噪声功率
+    ComplexSigma,  ///< 使用复噪声 RMS sigma 作为输入
+    NoisePower,    ///< 使用噪声功率（W）作为输入
+    ThermalKTB     ///< 使用 k*T*B*F 推导噪声功率
 };
+
+/**
+ * @brief 目标运动模型
+ */
+enum class MotionModel {
+    Stationary,           ///< 静止目标
+    ConstantVelocity,     ///< 匀速目标
+    ConstantAcceleration, ///< 匀加速目标
+    VariableAcceleration  ///< 变加速目标
+};
+
+/**
+ * @brief Swerling 起伏模型
+ */
+enum class SwerlingType {
+    Swerling0 = 0,  ///< 不起伏
+    Swerling1 = 1,  ///< 慢起伏，RCS 指数分布
+    Swerling2 = 2,  ///< 快起伏，RCS 指数分布
+    Swerling3 = 3,  ///< 慢起伏，RCS 卡方分布（4 自由度）
+    Swerling4 = 4   ///< 快起伏，RCS 卡方分布（4 自由度）
+};
+
+/**
+ * @brief 杂波分布模型
+ */
+enum class ClutterDistribution {
+    Rayleigh,      ///< 瑞利分布
+    Weibull,       ///< 韦伯分布
+    LogNormal,     ///< 对数正态分布
+    KDistribution  ///< K 分布
+};
+
+/**
+ * @brief 海杂波序列生成策略
+ */
+enum class SeaClutterSequenceMode {
+    InTimeMode,       ///< 每个散射单元按确定性种子独立生成
+    SequencePoolMode  ///< 先生成长序列池，再按单元随机起点截取
+};
+
+
 
 
 //=============================
 // 目标参数结构体
 //=============================
+
 /**
  * @brief 单目标状态（当前 CPI 起始时刻）
  */
 struct TargetState {
-  uint64_t id = 0;/// 目标唯一标识符
-  Vec3 position_m = Vec3::Zero();// 位置（雷达本地直角坐标）
-  Vec3 velocity_mps = Vec3::Zero();// 速度
-  Vec3 acceleration_mps2 = Vec3::Zero();// 加速度
-  MotionModel motion_model = MotionModel::ConstantVelocity;// 运动模型
-  Scalar rcs_mean_m2 = 1.0;// 平均 RCS（平方米）
-  SwerlingType swerling = SwerlingType::Swerling0;// Swerling 起伏模型
-  bool enabled = true;// 是否启用该目标
+    uint64_t id = 0;                       ///< 目标唯一标识符
+    Vec3 position_m = Vec3::Zero();        ///< 位置
+    Vec3 velocity_mps = Vec3::Zero();      ///< 速度
+    Vec3 acceleration_mps2 = Vec3::Zero(); ///< 加速度
+    MotionModel motion_model = MotionModel::ConstantVelocity;  ///< 运动模型
+    Scalar rcs_mean_m2 = 1.0;              ///< 平均 RCS
+    SwerlingType swerling = SwerlingType::Swerling0;  ///< Swerling 起伏模型
+    bool enabled = true;                   ///< 是否启用该目标
 };
-using TargetList = std::vector<TargetState>;// 目标状态
+
+using TargetList = std::vector<TargetState>;  ///< 目标状态列表
 
 /**
  * @brief 目标在某一时刻的快照（位置、速度、增益等）
@@ -258,12 +266,12 @@ struct TargetSnapshot {
 };
 
 /**
- * @brief 目标轨迹（包含多个快照）
+ * @brief 目标轨迹(CPI内单个目标轨迹）
  */
 struct TargetTrajectory {
     uint64_t target_id = 0;
     std::vector<TargetSnapshot> snapshots;
 };
-using TrajectoryBatch = std::vector<TargetTrajectory>;// 目标轨迹批次
+using TrajectoryBatch = std::vector<TargetTrajectory>;// 目标轨迹批次(CPI内所有目标轨迹）
 
 } // namespace radar

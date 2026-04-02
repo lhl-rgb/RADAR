@@ -5,30 +5,46 @@
 
 #include "clutter/clutter_engine.h"
 
-namespace radar {
+namespace radar::clutter {
 
-ClutterEngine::ClutterEngine(const SeaClutterParams& sea_params) {
-    // 构造阶段尽早校验参数；失败时错误信息由 last_error_ 暴露。
-    (void)set_sea_params(sea_params);
-}
+bool ClutterEngine::initialize() {
+    if (initialized_) {
+        return true;
+    }
 
-bool ClutterEngine::set_sea_params(const SeaClutterParams& sea_params) {
-    if (!sea_model_.set_params(sea_params)) {
+    if (!sea_cfg_.options.enabled) {
+        enabled_ = false;
+        initialized_ = true;
+        return true;
+    }
+
+    enabled_ = true;
+    if (!sea_model_.set_params(sea_cfg_)) {
         last_error_ = sea_model_.last_error();
         return false;
     }
+
+    initialized_ = true;
     last_error_.clear();
     return true;
 }
 
-bool ClutterEngine::generate_sea_clutter_cpi(const RadarParams& radar_params,
-                                             const PhasedArrayAntenna& antenna,
+bool ClutterEngine::generate_sea_clutter_cpi(const RadarSystemParams& system,
+                                             const antenna::AntennaModel& antenna,
                                              const AzEl& beam_pointing,
                                              int beam_index,
                                              const ComplexVec& tx_waveform,
                                              CpiEcho& out_clutter) {
-    // 当前为透传封装：统一错误接口，不改变 SeaClutterModel 的计算语义。
-    if (!sea_model_.generate_cpi(radar_params, antenna, beam_pointing, beam_index, tx_waveform,
+    if (!enabled_) {
+        return true;  // 未启用时直接返回成功，不生成杂波
+    }
+
+    if (!initialized_) {
+        last_error_ = "ClutterEngine not initialized";
+        return false;
+    }
+
+    if (!sea_model_.generate_cpi(system, antenna, beam_pointing, beam_index, tx_waveform,
                                  out_clutter)) {
         last_error_ = sea_model_.last_error();
         return false;
@@ -37,4 +53,4 @@ bool ClutterEngine::generate_sea_clutter_cpi(const RadarParams& radar_params,
     return true;
 }
 
-}  // namespace radar
+}  // namespace radar::clutter

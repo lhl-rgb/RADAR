@@ -84,6 +84,12 @@ target_link_libraries(
     ${_radar_fftw3_target}
 )
 
+# 网络库（UDP socket 需要）
+find_library(PTHREAD_LIBRARY pthread)
+if(PTHREAD_LIBRARY)
+  target_link_libraries(radar_deps INTERFACE pthread)
+endif()
+
 if(RADAR_ENABLE_CUDA AND CMAKE_CUDA_COMPILER)
   target_link_libraries(radar_deps INTERFACE CUDA::cudart_static)
 endif()

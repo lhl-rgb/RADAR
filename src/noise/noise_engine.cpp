@@ -4,41 +4,20 @@
  */
 
 #include "noise/noise_engine.h"
-#include "core/radar_system_params.h"
 #include "core/math_utils.h"
 
 #include <cmath>
 #include <limits>
 
-namespace radar {
+namespace radar::noise {
 
-NoiseEngine::NoiseEngine()
-    : cfg_(),
-      rng_(cfg_.seed),
-      standard_normal_(0.0, 1.0) {
-    RadarSystemParams sys;
-    const bool ok = set_params(sys, cfg_);
-    if (!ok) {
-        noise_power_w_ = math::clamp_positive_eps(EPSILON);
-        sigma_complex_ = std::sqrt(noise_power_w_);
-        sigma_iq_ = std::sqrt(math::safe_div(noise_power_w_, 2.0));
-        last_error_ = "NoiseEngine default parameters are invalid.";
+bool NoiseEngine::initialize() {
+    if (initialized_) {
+        return true;
     }
-}
 
-NoiseEngine::NoiseEngine(const RadarSystemParams& sys, const noise::NoiseConfig& cfg)
-    : NoiseEngine() {
-    (void)set_params(sys, cfg);
-}
-
-NoiseEngine::NoiseEngine(const NoiseParams& params)
-    : NoiseEngine() {
-    (void)set_params(params);
-}
-
-bool NoiseEngine::set_params(const RadarSystemParams& sys, const noise::NoiseConfig& cfg) {
     std::string error;
-    if (!cfg.validate(error)) {
+    if (!cfg_.validate(error)) {
         last_error_ = error;
         return false;
     }
@@ -47,7 +26,7 @@ bool NoiseEngine::set_params(const RadarSystemParams& sys, const noise::NoiseCon
     Scalar sigma_complex = 0.0;
     Scalar sigma_iq = 0.0;
 
-    if (!compute_noise_power(sys, cfg, noise_power_w, error)) {
+    if (!compute_noise_power(sys_, cfg_, noise_power_w, error)) {
         last_error_ = error;
         return false;
     }
@@ -57,39 +36,18 @@ bool NoiseEngine::set_params(const RadarSystemParams& sys, const noise::NoiseCon
         return false;
     }
 
-    cfg_ = cfg;
     noise_power_w_ = noise_power_w;
     sigma_complex_ = sigma_complex;
     sigma_iq_ = sigma_iq;
-    rng_.seed(cfg_.seed);
+    rng_.seed(cfg_.options.seed);
+    initialized_ = true;
     last_error_.clear();
 
     return true;
 }
 
-bool NoiseEngine::set_params(const NoiseParams& params) {
-    // 转换为新参数结构
-    RadarSystemParams sys;
-    sys.noise_figure_db = params.noise_figure_db;
-    sys.noise_figure_linear = math::db_to_linear(params.noise_figure_db);
-
-    noise::NoiseConfig cfg;
-    cfg.mode = params.mode;
-    cfg.sigma_complex = params.sigma_complex;
-    cfg.noise_power_w = params.noise_power_w;
-    cfg.system_temperature_k = params.system_temperature_k;
-    cfg.noise_bandwidth_hz = params.noise_bandwidth_hz;
-    cfg.seed = params.seed;
-
-    // 保存旧参数以兼容 params() 方法
-    legacy_params_ = params;
-
-    return set_params(sys, cfg);
-}
-
 void NoiseEngine::reseed(uint64_t seed) {
-    cfg_.seed = seed;
-    legacy_params_.seed = seed;
+    cfg_.options.seed = seed;
     rng_.seed(seed);
 }
 
@@ -120,36 +78,35 @@ void NoiseEngine::add_noise(CpiEcho& cpi_echo) {
 }
 
 bool NoiseEngine::compute_noise_power(const RadarSystemParams& sys,
-                                      const noise::NoiseConfig& cfg,
+                                      const NoiseConfig& cfg,
                                       Scalar& out_noise_power_w,
                                       std::string& error) {
-    switch (cfg.mode) {
+    switch (cfg.options.mode) {
     case NoiseLevelMode::ComplexSigma:
-        if (!math::is_finite_positive(cfg.sigma_complex)) {
+        if (!math::is_finite_positive(cfg.params.sigma_complex)) {
             error = "NoiseConfig invalid: sigma_complex must be positive and finite.";
             return false;
         }
-        out_noise_power_w = cfg.sigma_complex * cfg.sigma_complex;
+        out_noise_power_w = cfg.params.sigma_complex * cfg.params.sigma_complex;
         return true;
 
     case NoiseLevelMode::NoisePower:
-        if (!math::is_finite_positive(cfg.noise_power_w)) {
+        if (!math::is_finite_positive(cfg.params.noise_power_w)) {
             error = "NoiseConfig invalid: noise_power_w must be positive and finite.";
             return false;
         }
-        out_noise_power_w = cfg.noise_power_w;
+        out_noise_power_w = cfg.params.noise_power_w;
         return true;
 
     case NoiseLevelMode::ThermalKTB:
-        if (!math::is_finite_positive(cfg.system_temperature_k)) {
+        if (!math::is_finite_positive(cfg.params.system_temperature_k)) {
             error = "NoiseConfig invalid: system_temperature_k must be positive and finite.";
             return false;
         }
-        if (!math::is_finite_positive(cfg.noise_bandwidth_hz)) {
+        if (!math::is_finite_positive(cfg.params.noise_bandwidth_hz)) {
             error = "NoiseConfig invalid: noise_bandwidth_hz must be positive and finite.";
             return false;
         }
-        // 使用 RadarSystemParams 中的 noise_figure_db
         if (!std::isfinite(sys.noise_figure_db) || sys.noise_figure_db < 0.0) {
             error = "RadarSystemParams invalid: noise_figure_db must be finite and >= 0.";
             return false;
@@ -157,59 +114,13 @@ bool NoiseEngine::compute_noise_power(const RadarSystemParams& sys,
 
         out_noise_power_w =
             kBoltzmann *
-            cfg.system_temperature_k *
-            cfg.noise_bandwidth_hz *
+            cfg.params.system_temperature_k *
+            cfg.params.noise_bandwidth_hz *
             math::db_to_linear(sys.noise_figure_db);
         return true;
     }
 
     error = "NoiseConfig invalid: unsupported mode.";
-    return false;
-}
-
-bool NoiseEngine::compute_noise_power_legacy(const NoiseParams& params,
-                                             Scalar& out_noise_power_w,
-                                             std::string& error) {
-    switch (params.mode) {
-    case NoiseLevelMode::ComplexSigma:
-        if (!math::is_finite_positive(params.sigma_complex)) {
-            error = "NoiseParams invalid: sigma_complex must be positive and finite.";
-            return false;
-        }
-        out_noise_power_w = params.sigma_complex * params.sigma_complex;
-        return true;
-
-    case NoiseLevelMode::NoisePower:
-        if (!math::is_finite_positive(params.noise_power_w)) {
-            error = "NoiseParams invalid: noise_power_w must be positive and finite.";
-            return false;
-        }
-        out_noise_power_w = params.noise_power_w;
-        return true;
-
-    case NoiseLevelMode::ThermalKTB:
-        if (!math::is_finite_positive(params.system_temperature_k)) {
-            error = "NoiseParams invalid: system_temperature_k must be positive and finite.";
-            return false;
-        }
-        if (!math::is_finite_positive(params.noise_bandwidth_hz)) {
-            error = "NoiseParams invalid: noise_bandwidth_hz must be positive and finite.";
-            return false;
-        }
-        if (!std::isfinite(params.noise_figure_db) || params.noise_figure_db < 0.0) {
-            error = "NoiseParams invalid: noise_figure_db must be finite and >= 0.";
-            return false;
-        }
-
-        out_noise_power_w =
-            kBoltzmann *
-            params.system_temperature_k *
-            params.noise_bandwidth_hz *
-            math::db_to_linear(params.noise_figure_db);
-        return true;
-    }
-
-    error = "NoiseParams invalid: unsupported mode.";
     return false;
 }
 

@@ -78,7 +78,7 @@ include/
 │   └── sea_clutter_config.h         # 新增
 │
 ├── target/
-│   ├── target_config.h              # 新增：目标配置
+│   ├── target_config.hpp              # 新增：目标配置
 │   └── target_state.h               # 保持
 │
 src/
@@ -302,7 +302,7 @@ struct SeaClutterConfig {
 ### 4.5 target::TargetConfig
 
 ```cpp
-// include/target/target_config.h
+// include/target/target_config.hpp
 #pragma once
 
 #include "core/types.h"
@@ -342,7 +342,7 @@ struct TargetConfig {
 #include "antenna/antenna_config.h"
 #include "noise/noise_config.h"
 #include "clutter/sea_clutter_config.h"
-#include "target/target_config.h"
+#include "target/target_config.hpp"
 #include <string>
 
 namespace radar {

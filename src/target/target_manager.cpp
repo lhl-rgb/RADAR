@@ -5,7 +5,7 @@
 
 #include "target/target_manager.h"
 
-namespace radar {
+namespace radar::target {
 
 void TargetManager::set_targets(const TargetList& targets) {
     initial_targets_ = targets;  // 深拷贝初始状态

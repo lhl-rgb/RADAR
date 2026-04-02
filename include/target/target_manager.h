@@ -12,7 +12,7 @@
 
 #include "core/types.h"
 
-namespace radar {
+namespace radar::target {
 
 /**
  * @brief 目标状态管理器

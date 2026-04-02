@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth:*)",
+      "Bash(git remote:*)",
+      "Read(//home/lhlj/.ssh/**)",
+      "Bash(make)",
+      "Bash(cmake .. -DRADAR_BUILD_TESTS=OFF)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(timeout 30 /home/lhlj/Radar/build/bin/radar)",
+      "Bash(timeout 60 /home/lhlj/Radar/build/bin/radar)",
+      "Bash(chmod +x /home/lhlj/Radar/build.sh)",
+      "Bash(/home/lhlj/Radar/build.sh)",
+      "Bash(/home/lhlj/Radar/out/bin/radar)",
+      "Bash(git push:*)"
+    ]
+  }
+}

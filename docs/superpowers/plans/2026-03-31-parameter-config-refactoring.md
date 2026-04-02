@@ -26,7 +26,7 @@ include/
 ├── clutter/
 │   └── sea_clutter_config.h     # Sea clutter config
 ├── target/
-│   └── target_config.h          # Target module config
+│   └── target_config.hpp          # Target module config
 
 src/
 ├── core/
@@ -750,13 +750,13 @@ git commit -m "feat(params): add clutter::SeaClutterConfig"
 ## Task 8: Create target::TargetConfig
 
 **Files:**
-- Create: `include/target/target_config.h`
+- Create: `include/target/target_config.hpp`
 - Create: `src/target/target_config.cpp`
 
 - [ ] **Step 1: Write TargetConfig header**
 
 ```cpp
-// include/target/target_config.h
+// include/target/target_config.hpp
 #pragma once
 
 #include "core/types.h"
@@ -788,7 +788,7 @@ struct TargetConfig {
 
 ```cpp
 // src/target/target_config.cpp
-#include "target/target_config.h"
+#include "target/target_config.hpp"
 #include "core/math_utils.h"
 
 namespace radar::target {
@@ -807,7 +807,7 @@ bool TargetConfig::validate(std::string& error) const {
 - [ ] **Step 3: Commit TargetConfig**
 
 ```bash
-git add include/target/target_config.h src/target/target_config.cpp
+git add include/target/target_config.hpp src/target/target_config.cpp
 git commit -m "feat(params): add target::TargetConfig"
 ```
 
@@ -830,7 +830,7 @@ git commit -m "feat(params): add target::TargetConfig"
 #include "antenna/antenna_config.h"
 #include "noise/noise_config.h"
 #include "clutter/sea_clutter_config.h"
-#include "target/target_config.h"
+#include "target/target_config.hpp"
 #include <string>
 
 namespace radar {
@@ -1404,7 +1404,7 @@ git commit -m "refactor(clutter): update ClutterEngine to use RadarSystemParams 
 #pragma once
 
 #include "core/radar_system_params.h"
-#include "target/target_config.h"
+#include "target/target_config.hpp"
 #include "core/antenna_set.h"
 #include <cstdint>
 #include <string>
