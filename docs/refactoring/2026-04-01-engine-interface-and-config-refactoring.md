@@ -98,7 +98,7 @@ struct NoiseConfig {
 
 | 原结构 | 新结构 | 说明 |
 |--------|--------|------|
-| `WaveformConfig` | `WaveformOptions` + `WaveformParams` | 波形配置 |
+| `WaveformConfig` | `WaveformConfig` + `` | 波形配置 |
 | `AntennaConfig` | `AntennaOptions` + `AntennaPhysicalParams` | 天线配置 |
 | `NoiseConfig` | `NoiseOptions` + `NoiseParams` | 噪声配置 |
 | `SeaClutterConfig` | `ClutterOptions` + `ClutterPhysicalParams` | 海杂波配置 |

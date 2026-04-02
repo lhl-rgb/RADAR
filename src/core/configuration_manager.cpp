@@ -123,18 +123,18 @@ void from_json(const nlohmann::json& j, RadarSystemParams& sys) {
 // Helper: convert from json to waveform::WaveformConfig
 void from_json(const nlohmann::json& j, waveform::WaveformConfig& cfg) {
     // 支持扁平化格式（向后兼容）
-    if (j.contains("waveform_type")) j.at("waveform_type").get_to(cfg.options.waveform_type);
-    if (j.contains("phase_code_type")) j.at("phase_code_type").get_to(cfg.options.phase_code_type);
-    if (j.contains("nlfm_window_type")) j.at("nlfm_window_type").get_to(cfg.options.nlfm_window_type);
-    if (j.contains("polarization")) j.at("polarization").get_to(cfg.options.polarization);
+    if (j.contains("waveform_type")) j.at("waveform_type").get_to(cfg.waveform_type);
+    if (j.contains("phase_code_type")) j.at("phase_code_type").get_to(cfg.phase_code_type);
+    if (j.contains("nlfm_window_type")) j.at("nlfm_window_type").get_to(cfg.nlfm_window_type);
+    if (j.contains("polarization")) j.at("polarization").get_to(cfg.polarization);
 
     // 支持嵌套格式（新格式）
     if (j.contains("options")) {
         const auto& opts = j.at("options");
-        if (opts.contains("waveform_type")) opts.at("waveform_type").get_to(cfg.options.waveform_type);
-        if (opts.contains("phase_code_type")) opts.at("phase_code_type").get_to(cfg.options.phase_code_type);
-        if (opts.contains("nlfm_window_type")) opts.at("nlfm_window_type").get_to(cfg.options.nlfm_window_type);
-        if (opts.contains("polarization")) opts.at("polarization").get_to(cfg.options.polarization);
+        if (opts.contains("waveform_type")) opts.at("waveform_type").get_to(cfg.waveform_type);
+        if (opts.contains("phase_code_type")) opts.at("phase_code_type").get_to(cfg.phase_code_type);
+        if (opts.contains("nlfm_window_type")) opts.at("nlfm_window_type").get_to(cfg.nlfm_window_type);
+        if (opts.contains("polarization")) opts.at("polarization").get_to(cfg.polarization);
     }
 }
 
@@ -171,77 +171,81 @@ void from_json(const nlohmann::json& j, antenna::AntennaConfig& cfg) {
 // Helper: convert from json to noise::NoiseConfig
 void from_json(const nlohmann::json& j, noise::NoiseConfig& cfg) {
     // 支持扁平化格式（向后兼容）
-    if (j.contains("enabled")) j.at("enabled").get_to(cfg.options.enabled);
-    if (j.contains("mode")) j.at("mode").get_to(cfg.options.mode);
-    if (j.contains("sigma_complex")) j.at("sigma_complex").get_to(cfg.params.sigma_complex);
-    if (j.contains("noise_power_w")) j.at("noise_power_w").get_to(cfg.params.noise_power_w);
-    if (j.contains("system_temperature_k")) j.at("system_temperature_k").get_to(cfg.params.system_temperature_k);
-    if (j.contains("noise_bandwidth_hz")) j.at("noise_bandwidth_hz").get_to(cfg.params.noise_bandwidth_hz);
-    if (j.contains("seed")) j.at("seed").get_to(cfg.options.seed);
+    if (j.contains("enabled")) j.at("enabled").get_to(cfg.enabled);
+    if (j.contains("mode")) j.at("mode").get_to(cfg.mode);
+    if (j.contains("sigma_complex")) j.at("sigma_complex").get_to(cfg.sigma_complex);
+    if (j.contains("noise_power_w")) j.at("noise_power_w").get_to(cfg.noise_power_w);
+    if (j.contains("system_temperature_k")) j.at("system_temperature_k").get_to(cfg.system_temperature_k);
+    if (j.contains("noise_bandwidth_hz")) j.at("noise_bandwidth_hz").get_to(cfg.noise_bandwidth_hz);
+    if (j.contains("seed")) j.at("seed").get_to(cfg.seed);
 
     // 支持嵌套格式（新格式）
     if (j.contains("options")) {
         const auto& opts = j.at("options");
-        if (opts.contains("enabled")) opts.at("enabled").get_to(cfg.options.enabled);
-        if (opts.contains("mode")) opts.at("mode").get_to(cfg.options.mode);
-        if (opts.contains("seed")) opts.at("seed").get_to(cfg.options.seed);
+        if (opts.contains("enabled")) opts.at("enabled").get_to(cfg.enabled);
+        if (opts.contains("mode")) opts.at("mode").get_to(cfg.mode);
+        if (opts.contains("seed")) opts.at("seed").get_to(cfg.seed);
+        if (opts.contains("sigma_complex")) opts.at("sigma_complex").get_to(cfg.sigma_complex);
+        if (opts.contains("noise_power_w")) opts.at("noise_power_w").get_to(cfg.noise_power_w);
+        if (opts.contains("system_temperature_k")) opts.at("system_temperature_k").get_to(cfg.system_temperature_k);
+        if (opts.contains("noise_bandwidth_hz")) opts.at("noise_bandwidth_hz").get_to(cfg.noise_bandwidth_hz);
     }
 
     if (j.contains("params")) {
         const auto& params = j.at("params");
-        if (params.contains("sigma_complex")) params.at("sigma_complex").get_to(cfg.params.sigma_complex);
-        if (params.contains("noise_power_w")) params.at("noise_power_w").get_to(cfg.params.noise_power_w);
-        if (params.contains("system_temperature_k")) params.at("system_temperature_k").get_to(cfg.params.system_temperature_k);
-        if (params.contains("noise_bandwidth_hz")) params.at("noise_bandwidth_hz").get_to(cfg.params.noise_bandwidth_hz);
+        if (params.contains("sigma_complex")) params.at("sigma_complex").get_to(cfg.sigma_complex);
+        if (params.contains("noise_power_w")) params.at("noise_power_w").get_to(cfg.noise_power_w);
+        if (params.contains("system_temperature_k")) params.at("system_temperature_k").get_to(cfg.system_temperature_k);
+        if (params.contains("noise_bandwidth_hz")) params.at("noise_bandwidth_hz").get_to(cfg.noise_bandwidth_hz);
     }
 }
 
 // Helper: convert from json to clutter::SeaClutterConfig
 void from_json(const nlohmann::json& j, clutter::SeaClutterConfig& cfg) {
     // 支持扁平化格式（向后兼容）
-    if (j.contains("enabled")) j.at("enabled").get_to(cfg.options.enabled);
-    if (j.contains("sequence_mode")) j.at("sequence_mode").get_to(cfg.options.sequence_mode);
-    if (j.contains("seed")) j.at("seed").get_to(cfg.options.seed);
+    if (j.contains("enabled")) j.at("enabled").get_to(cfg.enabled);
+    if (j.contains("sequence_mode")) j.at("sequence_mode").get_to(cfg.sequence_mode);
+    if (j.contains("seed")) j.at("seed").get_to(cfg.seed);
 
-    if (j.contains("ground_range_min_m")) j.at("ground_range_min_m").get_to(cfg.params.ground_range_min_m);
-    if (j.contains("ground_range_max_m")) j.at("ground_range_max_m").get_to(cfg.params.ground_range_max_m);
-    if (j.contains("range_step_m")) j.at("range_step_m").get_to(cfg.params.range_step_m);
-    if (j.contains("beam_az_width_deg")) j.at("beam_az_width_deg").get_to(cfg.params.beam_az_width_deg);
-    if (j.contains("az_step_deg")) j.at("az_step_deg").get_to(cfg.params.az_step_deg);
-    if (j.contains("k_shape_nu")) j.at("k_shape_nu").get_to(cfg.params.k_shape_nu);
-    if (j.contains("doppler_center_hz")) j.at("doppler_center_hz").get_to(cfg.params.doppler_center_hz);
-    if (j.contains("doppler_sigma_hz")) j.at("doppler_sigma_hz").get_to(cfg.params.doppler_sigma_hz);
-    if (j.contains("pool_length_factor")) j.at("pool_length_factor").get_to(cfg.params.pool_length_factor);
+    if (j.contains("ground_range_min_m")) j.at("ground_range_min_m").get_to(cfg.ground_range_min_m);
+    if (j.contains("ground_range_max_m")) j.at("ground_range_max_m").get_to(cfg.ground_range_max_m);
+    if (j.contains("range_step_m")) j.at("range_step_m").get_to(cfg.range_step_m);
+    if (j.contains("beam_az_width_deg")) j.at("beam_az_width_deg").get_to(cfg.beam_az_width_deg);
+    if (j.contains("az_step_deg")) j.at("az_step_deg").get_to(cfg.az_step_deg);
+    if (j.contains("k_shape_nu")) j.at("k_shape_nu").get_to(cfg.k_shape_nu);
+    if (j.contains("doppler_center_hz")) j.at("doppler_center_hz").get_to(cfg.doppler_center_hz);
+    if (j.contains("doppler_sigma_hz")) j.at("doppler_sigma_hz").get_to(cfg.doppler_sigma_hz);
+    if (j.contains("pool_length_factor")) j.at("pool_length_factor").get_to(cfg.pool_length_factor);
 
     // 支持嵌套格式（新格式）
     if (j.contains("options")) {
         const auto& opts = j.at("options");
-        if (opts.contains("enabled")) opts.at("enabled").get_to(cfg.options.enabled);
-        if (opts.contains("sequence_mode")) opts.at("sequence_mode").get_to(cfg.options.sequence_mode);
-        if (opts.contains("seed")) opts.at("seed").get_to(cfg.options.seed);
+        if (opts.contains("enabled")) opts.at("enabled").get_to(cfg.enabled);
+        if (opts.contains("sequence_mode")) opts.at("sequence_mode").get_to(cfg.sequence_mode);
+        if (opts.contains("seed")) opts.at("seed").get_to(cfg.seed);
     }
 
     if (j.contains("params")) {
         const auto& params = j.at("params");
-        if (params.contains("ground_range_min_m")) params.at("ground_range_min_m").get_to(cfg.params.ground_range_min_m);
-        if (params.contains("ground_range_max_m")) params.at("ground_range_max_m").get_to(cfg.params.ground_range_max_m);
-        if (params.contains("range_step_m")) params.at("range_step_m").get_to(cfg.params.range_step_m);
-        if (params.contains("beam_az_width_deg")) params.at("beam_az_width_deg").get_to(cfg.params.beam_az_width_deg);
-        if (params.contains("az_step_deg")) params.at("az_step_deg").get_to(cfg.params.az_step_deg);
-        if (params.contains("k_shape_nu")) params.at("k_shape_nu").get_to(cfg.params.k_shape_nu);
-        if (params.contains("doppler_center_hz")) params.at("doppler_center_hz").get_to(cfg.params.doppler_center_hz);
-        if (params.contains("doppler_sigma_hz")) params.at("doppler_sigma_hz").get_to(cfg.params.doppler_sigma_hz);
-        if (params.contains("pool_length_factor")) params.at("pool_length_factor").get_to(cfg.params.pool_length_factor);
+        if (params.contains("ground_range_min_m")) params.at("ground_range_min_m").get_to(cfg.ground_range_min_m);
+        if (params.contains("ground_range_max_m")) params.at("ground_range_max_m").get_to(cfg.ground_range_max_m);
+        if (params.contains("range_step_m")) params.at("range_step_m").get_to(cfg.range_step_m);
+        if (params.contains("beam_az_width_deg")) params.at("beam_az_width_deg").get_to(cfg.beam_az_width_deg);
+        if (params.contains("az_step_deg")) params.at("az_step_deg").get_to(cfg.az_step_deg);
+        if (params.contains("k_shape_nu")) params.at("k_shape_nu").get_to(cfg.k_shape_nu);
+        if (params.contains("doppler_center_hz")) params.at("doppler_center_hz").get_to(cfg.doppler_center_hz);
+        if (params.contains("doppler_sigma_hz")) params.at("doppler_sigma_hz").get_to(cfg.doppler_sigma_hz);
+        if (params.contains("pool_length_factor")) params.at("pool_length_factor").get_to(cfg.pool_length_factor);
         if (params.contains("morchin")) {
             const auto& mor = params.at("morchin");
-            if (mor.contains("sea_state")) mor.at("sea_state").get_to(cfg.params.morchin.sea_state);
+            if (mor.contains("sea_state")) mor.at("sea_state").get_to(cfg.morchin.sea_state);
         }
     }
 
     // Morchin 嵌套解析（扁平化兼容）
     if (j.contains("morchin")) {
         const auto& morchin_json = j.at("morchin");
-        if (morchin_json.contains("sea_state")) morchin_json.at("sea_state").get_to(cfg.params.morchin.sea_state);
+        if (morchin_json.contains("sea_state")) morchin_json.at("sea_state").get_to(cfg.morchin.sea_state);
     }
 }
 
@@ -262,18 +266,18 @@ void from_json(const nlohmann::json& j, RadarConfig& cfg) {
     if (j.contains("waveform")) {
         const auto& wf = j.at("waveform");
         // 扁平化格式（向后兼容）
-        if (wf.contains("waveform_type")) wf.at("waveform_type").get_to(cfg.waveform.options.waveform_type);
-        if (wf.contains("phase_code_type")) wf.at("phase_code_type").get_to(cfg.waveform.options.phase_code_type);
-        if (wf.contains("nlfm_window_type")) wf.at("nlfm_window_type").get_to(cfg.waveform.options.nlfm_window_type);
-        if (wf.contains("polarization")) wf.at("polarization").get_to(cfg.waveform.options.polarization);
+        if (wf.contains("waveform_type")) wf.at("waveform_type").get_to(cfg.waveform.waveform_type);
+        if (wf.contains("phase_code_type")) wf.at("phase_code_type").get_to(cfg.waveform.phase_code_type);
+        if (wf.contains("nlfm_window_type")) wf.at("nlfm_window_type").get_to(cfg.waveform.nlfm_window_type);
+        if (wf.contains("polarization")) wf.at("polarization").get_to(cfg.waveform.polarization);
 
         // 嵌套格式（新格式）
         if (wf.contains("options")) {
             const auto& opts = wf.at("options");
-            if (opts.contains("waveform_type")) opts.at("waveform_type").get_to(cfg.waveform.options.waveform_type);
-            if (opts.contains("phase_code_type")) opts.at("phase_code_type").get_to(cfg.waveform.options.phase_code_type);
-            if (opts.contains("nlfm_window_type")) opts.at("nlfm_window_type").get_to(cfg.waveform.options.nlfm_window_type);
-            if (opts.contains("polarization")) opts.at("polarization").get_to(cfg.waveform.options.polarization);
+            if (opts.contains("waveform_type")) opts.at("waveform_type").get_to(cfg.waveform.waveform_type);
+            if (opts.contains("phase_code_type")) opts.at("phase_code_type").get_to(cfg.waveform.phase_code_type);
+            if (opts.contains("nlfm_window_type")) opts.at("nlfm_window_type").get_to(cfg.waveform.nlfm_window_type);
+            if (opts.contains("polarization")) opts.at("polarization").get_to(cfg.waveform.polarization);
         }
     }
 
@@ -314,21 +318,22 @@ void from_json(const nlohmann::json& j, RadarConfig& cfg) {
     if (j.contains("noise")) {
         const auto& nse = j.at("noise");
         // 扁平化格式（向后兼容）
-        if (nse.contains("enabled")) nse.at("enabled").get_to(cfg.noise.options.enabled);
-        if (nse.contains("mode")) nse.at("mode").get_to(cfg.noise.options.mode);
-        if (nse.contains("sigma_complex")) nse.at("sigma_complex").get_to(cfg.noise.params.sigma_complex);
-        if (nse.contains("seed")) nse.at("seed").get_to(cfg.noise.options.seed);
+        if (nse.contains("enabled")) nse.at("enabled").get_to(cfg.noise.enabled);
+        if (nse.contains("mode")) nse.at("mode").get_to(cfg.noise.mode);
+        if (nse.contains("sigma_complex")) nse.at("sigma_complex").get_to(cfg.noise.sigma_complex);
+        if (nse.contains("seed")) nse.at("seed").get_to(cfg.noise.seed);
 
         // 嵌套格式（新格式）
         if (nse.contains("options")) {
             const auto& opts = nse.at("options");
-            if (opts.contains("enabled")) opts.at("enabled").get_to(cfg.noise.options.enabled);
-            if (opts.contains("mode")) opts.at("mode").get_to(cfg.noise.options.mode);
-            if (opts.contains("seed")) opts.at("seed").get_to(cfg.noise.options.seed);
+            if (opts.contains("enabled")) opts.at("enabled").get_to(cfg.noise.enabled);
+            if (opts.contains("mode")) opts.at("mode").get_to(cfg.noise.mode);
+            if (opts.contains("seed")) opts.at("seed").get_to(cfg.noise.seed);
+            if (opts.contains("sigma_complex")) opts.at("sigma_complex").get_to(cfg.noise.sigma_complex);
         }
         if (nse.contains("params")) {
             const auto& params = nse.at("params");
-            if (params.contains("sigma_complex")) params.at("sigma_complex").get_to(cfg.noise.params.sigma_complex);
+            if (params.contains("sigma_complex")) params.at("sigma_complex").get_to(cfg.noise.sigma_complex);
         }
     }
 
@@ -336,32 +341,32 @@ void from_json(const nlohmann::json& j, RadarConfig& cfg) {
     if (j.contains("clutter")) {
         const auto& clt = j.at("clutter");
         // 扁平化格式（向后兼容）
-        if (clt.contains("enabled")) clt.at("enabled").get_to(cfg.clutter.options.enabled);
-        if (clt.contains("k_shape_nu")) clt.at("k_shape_nu").get_to(cfg.clutter.params.k_shape_nu);
-        if (clt.contains("doppler_center_hz")) clt.at("doppler_center_hz").get_to(cfg.clutter.params.doppler_center_hz);
-        if (clt.contains("doppler_sigma_hz")) clt.at("doppler_sigma_hz").get_to(cfg.clutter.params.doppler_sigma_hz);
-        if (clt.contains("ground_range_min_m")) clt.at("ground_range_min_m").get_to(cfg.clutter.params.ground_range_min_m);
-        if (clt.contains("ground_range_max_m")) clt.at("ground_range_max_m").get_to(cfg.clutter.params.ground_range_max_m);
+        if (clt.contains("enabled")) clt.at("enabled").get_to(cfg.clutter.enabled);
+        if (clt.contains("k_shape_nu")) clt.at("k_shape_nu").get_to(cfg.clutter.k_shape_nu);
+        if (clt.contains("doppler_center_hz")) clt.at("doppler_center_hz").get_to(cfg.clutter.doppler_center_hz);
+        if (clt.contains("doppler_sigma_hz")) clt.at("doppler_sigma_hz").get_to(cfg.clutter.doppler_sigma_hz);
+        if (clt.contains("ground_range_min_m")) clt.at("ground_range_min_m").get_to(cfg.clutter.ground_range_min_m);
+        if (clt.contains("ground_range_max_m")) clt.at("ground_range_max_m").get_to(cfg.clutter.ground_range_max_m);
         if (clt.contains("morchin")) {
             const auto& mor = clt.at("morchin");
-            if (mor.contains("sea_state")) mor.at("sea_state").get_to(cfg.clutter.params.morchin.sea_state);
+            if (mor.contains("sea_state")) mor.at("sea_state").get_to(cfg.clutter.morchin.sea_state);
         }
 
         // 嵌套格式（新格式）
         if (clt.contains("options")) {
             const auto& opts = clt.at("options");
-            if (opts.contains("enabled")) opts.at("enabled").get_to(cfg.clutter.options.enabled);
+            if (opts.contains("enabled")) opts.at("enabled").get_to(cfg.clutter.enabled);
         }
         if (clt.contains("params")) {
             const auto& params = clt.at("params");
-            if (params.contains("k_shape_nu")) params.at("k_shape_nu").get_to(cfg.clutter.params.k_shape_nu);
-            if (params.contains("doppler_center_hz")) params.at("doppler_center_hz").get_to(cfg.clutter.params.doppler_center_hz);
-            if (params.contains("doppler_sigma_hz")) params.at("doppler_sigma_hz").get_to(cfg.clutter.params.doppler_sigma_hz);
-            if (params.contains("ground_range_min_m")) params.at("ground_range_min_m").get_to(cfg.clutter.params.ground_range_min_m);
-            if (params.contains("ground_range_max_m")) params.at("ground_range_max_m").get_to(cfg.clutter.params.ground_range_max_m);
+            if (params.contains("k_shape_nu")) params.at("k_shape_nu").get_to(cfg.clutter.k_shape_nu);
+            if (params.contains("doppler_center_hz")) params.at("doppler_center_hz").get_to(cfg.clutter.doppler_center_hz);
+            if (params.contains("doppler_sigma_hz")) params.at("doppler_sigma_hz").get_to(cfg.clutter.doppler_sigma_hz);
+            if (params.contains("ground_range_min_m")) params.at("ground_range_min_m").get_to(cfg.clutter.ground_range_min_m);
+            if (params.contains("ground_range_max_m")) params.at("ground_range_max_m").get_to(cfg.clutter.ground_range_max_m);
             if (params.contains("morchin")) {
                 const auto& mor = params.at("morchin");
-                if (mor.contains("sea_state")) mor.at("sea_state").get_to(cfg.clutter.params.morchin.sea_state);
+                if (mor.contains("sea_state")) mor.at("sea_state").get_to(cfg.clutter.morchin.sea_state);
             }
         }
     }
@@ -449,11 +454,11 @@ bool ConfigurationManager::save_to_json(const std::string& filepath) const {
         j["system"]["noise_figure_db"] = config_.system.noise_figure_db;
         j["system"]["system_loss_db"] = config_.system.system_loss_db;
 
-        // Waveform config (支持嵌套格式)
-        j["waveform"]["options"]["waveform_type"] = config_.waveform.options.waveform_type;
-        j["waveform"]["options"]["phase_code_type"] = config_.waveform.options.phase_code_type;
-        j["waveform"]["options"]["nlfm_window_type"] = config_.waveform.options.nlfm_window_type;
-        j["waveform"]["options"]["polarization"] = config_.waveform.options.polarization;
+        // Waveform config (扁平化格式)
+        j["waveform"]["waveform_type"] = config_.waveform.waveform_type;
+        j["waveform"]["phase_code_type"] = config_.waveform.phase_code_type;
+        j["waveform"]["nlfm_window_type"] = config_.waveform.nlfm_window_type;
+        j["waveform"]["polarization"] = config_.waveform.polarization;
 
         // Antenna config (扁平化格式)
         j["antenna"]["model_type"] = config_.antenna.model_type;
@@ -465,29 +470,29 @@ bool ConfigurationManager::save_to_json(const std::string& filepath) const {
         j["antenna"]["spacing_el_lambda"] = config_.antenna.spacing_el_lambda;
         j["antenna"]["peak_gain_db"] = config_.antenna.peak_gain_db;
 
-        // Noise config (嵌套格式)
-        j["noise"]["options"]["enabled"] = config_.noise.options.enabled;
-        j["noise"]["options"]["mode"] = config_.noise.options.mode;
-        j["noise"]["options"]["seed"] = config_.noise.options.seed;
-        j["noise"]["params"]["sigma_complex"] = config_.noise.params.sigma_complex;
-        j["noise"]["params"]["noise_power_w"] = config_.noise.params.noise_power_w;
-        j["noise"]["params"]["system_temperature_k"] = config_.noise.params.system_temperature_k;
-        j["noise"]["params"]["noise_bandwidth_hz"] = config_.noise.params.noise_bandwidth_hz;
+        // Noise config (扁平化格式)
+        j["noise"]["enabled"] = config_.noise.enabled;
+        j["noise"]["mode"] = config_.noise.mode;
+        j["noise"]["seed"] = config_.noise.seed;
+        j["noise"]["sigma_complex"] = config_.noise.sigma_complex;
+        j["noise"]["noise_power_w"] = config_.noise.noise_power_w;
+        j["noise"]["system_temperature_k"] = config_.noise.system_temperature_k;
+        j["noise"]["noise_bandwidth_hz"] = config_.noise.noise_bandwidth_hz;
 
-        // Clutter config (嵌套格式)
-        j["clutter"]["options"]["enabled"] = config_.clutter.options.enabled;
-        j["clutter"]["options"]["sequence_mode"] = config_.clutter.options.sequence_mode;
-        j["clutter"]["options"]["seed"] = config_.clutter.options.seed;
-        j["clutter"]["params"]["ground_range_min_m"] = config_.clutter.params.ground_range_min_m;
-        j["clutter"]["params"]["ground_range_max_m"] = config_.clutter.params.ground_range_max_m;
-        j["clutter"]["params"]["range_step_m"] = config_.clutter.params.range_step_m;
-        j["clutter"]["params"]["beam_az_width_deg"] = config_.clutter.params.beam_az_width_deg;
-        j["clutter"]["params"]["az_step_deg"] = config_.clutter.params.az_step_deg;
-        j["clutter"]["params"]["k_shape_nu"] = config_.clutter.params.k_shape_nu;
-        j["clutter"]["params"]["doppler_center_hz"] = config_.clutter.params.doppler_center_hz;
-        j["clutter"]["params"]["doppler_sigma_hz"] = config_.clutter.params.doppler_sigma_hz;
-        j["clutter"]["params"]["pool_length_factor"] = config_.clutter.params.pool_length_factor;
-        j["clutter"]["params"]["morchin"]["sea_state"] = config_.clutter.params.morchin.sea_state;
+        // Clutter config (扁平化格式)
+        j["clutter"]["enabled"] = config_.clutter.enabled;
+        j["clutter"]["sequence_mode"] = config_.clutter.sequence_mode;
+        j["clutter"]["seed"] = config_.clutter.seed;
+        j["clutter"]["ground_range_min_m"] = config_.clutter.ground_range_min_m;
+        j["clutter"]["ground_range_max_m"] = config_.clutter.ground_range_max_m;
+        j["clutter"]["range_step_m"] = config_.clutter.range_step_m;
+        j["clutter"]["beam_az_width_deg"] = config_.clutter.beam_az_width_deg;
+        j["clutter"]["az_step_deg"] = config_.clutter.az_step_deg;
+        j["clutter"]["k_shape_nu"] = config_.clutter.k_shape_nu;
+        j["clutter"]["doppler_center_hz"] = config_.clutter.doppler_center_hz;
+        j["clutter"]["doppler_sigma_hz"] = config_.clutter.doppler_sigma_hz;
+        j["clutter"]["pool_length_factor"] = config_.clutter.pool_length_factor;
+        j["clutter"]["morchin"]["sea_state"] = config_.clutter.morchin.sea_state;
 
         // Target config (嵌套格式)
         // Target config (扁平化)

@@ -96,7 +96,7 @@ bool WaveformGenerator::initialize() {
 
     const int num_samples = default_tx_samples(sys_);
 
-    switch (cfg_.options.waveform_type) {
+    switch (cfg_.waveform_type) {
     case WaveformType::LFM:
         waveform_ = generate_lfm(num_samples);
         break;
@@ -106,7 +106,7 @@ bool WaveformGenerator::initialize() {
         break;
 
     case WaveformType::PHASE_CODED:
-        waveform_ = generate_phase_coded(num_samples, cfg_.options.phase_code_type);
+        waveform_ = generate_phase_coded(num_samples, cfg_.phase_code_type);
         break;
 
     case WaveformType::CW:
@@ -170,7 +170,7 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const {
     std::vector<Scalar> freq_axis(static_cast<std::size_t>(num_freq_samples), 0.0);
     std::vector<Scalar> weight(static_cast<std::size_t>(num_freq_samples), 1.0);
 
-    const auto window_weights = generate_window_weights(num_freq_samples, cfg_.options.nlfm_window_type);
+    const auto window_weights = generate_window_weights(num_freq_samples, cfg_.nlfm_window_type);
 
     for (int k = 0; k < num_freq_samples; ++k) {
         const Scalar alpha = static_cast<Scalar>(k) /

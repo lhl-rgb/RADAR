@@ -3,9 +3,7 @@
  * @brief 海杂波模块配置参数
  *
  * 设计说明：
- * - ClutterOptions: 海杂波行为选项（模式、种子等）
- * - ClutterPhysicalParams: 海杂波物理参数（几何参数、频谱参数、Morchin 模型参数）
- * - SeaClutterConfig: 完整配置容器
+ * - SeaClutterConfig: 扁平化配置容器（行为选项 + 物理参数）
  */
 
 #pragma once
@@ -36,22 +34,16 @@ struct MorchinConfig {
 };
 
 /**
- * @brief 海杂波行为选项
+ * @brief 海杂波配置（扁平化）
  *
- * 只包含行为选项，不包含物理参数。
+ * 包含海杂波的行为选项、几何参数、频谱参数和模型参数。
  */
-struct ClutterOptions {
+struct SeaClutterConfig {
+    // 行为选项
     bool enabled = true;                            ///< 是否启用海杂波
     SeaClutterSequenceMode sequence_mode = SeaClutterSequenceMode::SequencePoolMode; ///< 慢时间序列生成策略
     uint64_t seed = 2026;                           ///< 随机种子
-};
 
-/**
- * @brief 海杂波物理参数
- *
- * 包含海杂波的几何参数、频谱参数和模型参数。
- */
-struct ClutterPhysicalParams {
     // 几何参数
     Scalar ground_range_min_m = -1.0;   ///< 地距下限（m）；-1 表示跟随 RadarSystemParams
     Scalar ground_range_max_m = -1.0;   ///< 地距上限（m）；-1 表示跟随 RadarSystemParams
@@ -69,14 +61,6 @@ struct ClutterPhysicalParams {
 
     // Morchin 模型参数
     MorchinConfig morchin;              ///< Morchin 模型参数
-};
-
-/**
- * @brief 海杂波完整配置容器
- */
-struct SeaClutterConfig {
-    ClutterOptions options;             ///< 海杂波行为选项
-    ClutterPhysicalParams params;       ///< 海杂波物理参数
 
     /**
      * @brief 验证配置参数
@@ -87,33 +71,31 @@ struct SeaClutterConfig {
 };
 
 inline bool SeaClutterConfig::validate(std::string& error) const {
-    const auto& p = params;
-
-    if (!math::is_finite(p.ground_range_min_m) ||
-        !math::is_finite(p.ground_range_max_m) ||
-        !math::is_finite(p.range_step_m) ||
-        !math::is_finite(p.beam_az_width_deg) ||
-        !math::is_finite(p.az_step_deg) ||
-        !math::is_finite(p.k_shape_nu) ||
-        !math::is_finite(p.doppler_center_hz) ||
-        !math::is_finite(p.doppler_sigma_hz) ||
-        !math::is_finite(p.morchin.a0_db) ||
-        !math::is_finite(p.morchin.a_g) ||
-        !math::is_finite(p.morchin.a_f) ||
-        !math::is_finite(p.morchin.a_s) ||
-        !math::is_finite(p.morchin.sea_state) ||
-        !math::is_finite(p.morchin.sin_psi_floor)) {
+    if (!math::is_finite(ground_range_min_m) ||
+        !math::is_finite(ground_range_max_m) ||
+        !math::is_finite(range_step_m) ||
+        !math::is_finite(beam_az_width_deg) ||
+        !math::is_finite(az_step_deg) ||
+        !math::is_finite(k_shape_nu) ||
+        !math::is_finite(doppler_center_hz) ||
+        !math::is_finite(doppler_sigma_hz) ||
+        !math::is_finite(morchin.a0_db) ||
+        !math::is_finite(morchin.a_g) ||
+        !math::is_finite(morchin.a_f) ||
+        !math::is_finite(morchin.a_s) ||
+        !math::is_finite(morchin.sea_state) ||
+        !math::is_finite(morchin.sin_psi_floor)) {
         error = "all parameters must be finite";
         return false;
     }
 
-    if (p.range_step_m <= 0.0 ||
-        p.beam_az_width_deg <= 0.0 ||
-        p.az_step_deg <= 0.0 ||
-        p.k_shape_nu <= 0.0 ||
-        p.doppler_sigma_hz <= 0.0 ||
-        p.pool_length_factor <= 0 ||
-        p.morchin.sin_psi_floor <= 0.0) {
+    if (range_step_m <= 0.0 ||
+        beam_az_width_deg <= 0.0 ||
+        az_step_deg <= 0.0 ||
+        k_shape_nu <= 0.0 ||
+        doppler_sigma_hz <= 0.0 ||
+        pool_length_factor <= 0 ||
+        morchin.sin_psi_floor <= 0.0) {
         error = "range_step, beam_az_width, az_step, k_shape_nu, doppler_sigma, pool_length_factor, and sin_psi_floor must be positive";
         return false;
     }

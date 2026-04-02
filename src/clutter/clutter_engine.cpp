@@ -12,7 +12,7 @@ bool ClutterEngine::initialize() {
         return true;
     }
 
-    if (!sea_cfg_.options.enabled) {
+    if (!sea_cfg_.enabled) {
         enabled_ = false;
         initialized_ = true;
         return true;

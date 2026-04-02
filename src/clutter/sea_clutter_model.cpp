@@ -158,7 +158,7 @@ bool SeaClutterModel::generate_cpi(const RadarSystemParams& system,
         return false;
     }
     std::string nyquist_error;
-    if (!validate_doppler_center_nyquist(params_.params.doppler_center_hz, system.prf_hz,
+    if (!validate_doppler_center_nyquist(params_.doppler_center_hz, system.prf_hz,
                                          nyquist_error)) {
         last_error_ = "SeaClutterModel::generate_cpi failed: " + nyquist_error;
         return false;
@@ -184,7 +184,7 @@ bool SeaClutterModel::generate_cpi(const RadarSystemParams& system,
         static_cast<std::size_t>(system.pulses_per_cpi),
         PulseEcho(static_cast<std::size_t>(system.samples_per_pulse), Complex(0.0, 0.0)));
 
-    if (!params_.options.enabled) {
+    if (!params_.enabled) {
         return true;
     }
 
@@ -200,14 +200,14 @@ bool SeaClutterModel::generate_cpi(const RadarSystemParams& system,
     }
 
     ComplexVec sequence_pool;
-    if (params_.options.sequence_mode == SeaClutterSequenceMode::SequencePoolMode) {
+    if (params_.sequence_mode == SeaClutterSequenceMode::SequencePoolMode) {
         const std::size_t pool_length = std::max<std::size_t>(
             static_cast<std::size_t>(system.pulses_per_cpi),
-            static_cast<std::size_t>(params_.params.pool_length_factor) *
+            static_cast<std::size_t>(params_.pool_length_factor) *
                 static_cast<std::size_t>(system.pulses_per_cpi));
         sequence_pool = generate_sequence_pool(pool_length, beam_index, system.prf_hz,
-                                            params_.params.doppler_center_hz, params_.params.doppler_sigma_hz,
-                                            params_.params.k_shape_nu);
+                                            params_.doppler_center_hz, params_.doppler_sigma_hz,
+                                            params_.k_shape_nu);
         if (sequence_pool.empty()) {
             last_error_ = "SeaClutterModel::generate_cpi failed: sequence pool build failed.";
             return false;
@@ -217,15 +217,15 @@ bool SeaClutterModel::generate_cpi(const RadarSystemParams& system,
     for (const CellInfo& cell : cells) {
         ComplexVec cell_sequence;
 
-        if (params_.options.sequence_mode == SeaClutterSequenceMode::InTimeMode) {
+        if (params_.sequence_mode == SeaClutterSequenceMode::InTimeMode) {
             cell_sequence =
                 generate_sequence(static_cast<std::size_t>(system.pulses_per_cpi),
                                          beam_index, cell.range_index, cell.az_index,
-                                         system.prf_hz, params_.params.doppler_center_hz,
-                                         params_.params.doppler_sigma_hz, params_.params.k_shape_nu);
+                                         system.prf_hz, params_.doppler_center_hz,
+                                         params_.doppler_sigma_hz, params_.k_shape_nu);
         } else {
             const uint64_t seed =
-                cell_seed(params_.options.seed, beam_index, cell.range_index, cell.az_index);
+                cell_seed(params_.seed, beam_index, cell.range_index, cell.az_index);
             const std::size_t start =
                 static_cast<std::size_t>(seed % static_cast<uint64_t>(sequence_pool.size()));
             const Scalar phase = 2.0 * PI *
@@ -269,53 +269,53 @@ bool SeaClutterModel::generate_cpi(const RadarSystemParams& system,
 
 bool SeaClutterModel::validate_params(const clutter::SeaClutterConfig& params, std::string& error) {
     error.clear();
-    if (params.params.ground_range_min_m < 0.0 && params.params.ground_range_min_m != -1.0) {
+    if (params.ground_range_min_m < 0.0 && params.ground_range_min_m != -1.0) {
         error = "ground_range_min_m must be -1 or >= 0.";
         return false;
     }
-    if (params.params.ground_range_max_m < 0.0 && params.params.ground_range_max_m != -1.0) {
+    if (params.ground_range_max_m < 0.0 && params.ground_range_max_m != -1.0) {
         error = "ground_range_max_m must be -1 or >= 0.";
         return false;
     }
-    if (params.params.ground_range_min_m >= 0.0 && params.params.ground_range_max_m >= 0.0 &&
-        params.params.ground_range_max_m <= params.params.ground_range_min_m) {
+    if (params.ground_range_min_m >= 0.0 && params.ground_range_max_m >= 0.0 &&
+        params.ground_range_max_m <= params.ground_range_min_m) {
         error = "ground_range_max_m must be greater than ground_range_min_m.";
         return false;
     }
 
-    if (!math::is_finite_positive(params.params.range_step_m)) {
+    if (!math::is_finite_positive(params.range_step_m)) {
         error = "range_step_m must be positive and finite.";
         return false;
     }
-    if (!math::is_finite_positive(params.params.beam_az_width_deg)) {
+    if (!math::is_finite_positive(params.beam_az_width_deg)) {
         error = "beam_az_width_deg must be positive and finite.";
         return false;
     }
-    if (!math::is_finite_positive(params.params.az_step_deg)) {
+    if (!math::is_finite_positive(params.az_step_deg)) {
         error = "az_step_deg must be positive and finite.";
         return false;
     }
-    if (!math::is_finite_positive(params.params.k_shape_nu)) {
+    if (!math::is_finite_positive(params.k_shape_nu)) {
         error = "k_shape_nu must be positive and finite.";
         return false;
     }
-    if (!math::is_finite_positive(params.params.doppler_sigma_hz)) {
+    if (!math::is_finite_positive(params.doppler_sigma_hz)) {
         error = "doppler_sigma_hz must be positive and finite.";
         return false;
     }
-    if (!math::is_finite(params.params.doppler_center_hz)) {
+    if (!math::is_finite(params.doppler_center_hz)) {
         error = "doppler_center_hz must be finite.";
         return false;
     }
-    if (params.params.pool_length_factor <= 0) {
+    if (params.pool_length_factor <= 0) {
         error = "pool_length_factor must be positive.";
         return false;
     }
 
-    if (!std::isfinite(params.params.morchin.a0_db) || !std::isfinite(params.params.morchin.a_g) ||
-        !std::isfinite(params.params.morchin.a_f) || !std::isfinite(params.params.morchin.a_s) ||
-        !std::isfinite(params.params.morchin.sea_state) ||
-        !math::is_finite_positive(params.params.morchin.sin_psi_floor)) {
+    if (!std::isfinite(params.morchin.a0_db) || !std::isfinite(params.morchin.a_g) ||
+        !std::isfinite(params.morchin.a_f) || !std::isfinite(params.morchin.a_s) ||
+        !std::isfinite(params.morchin.sea_state) ||
+        !math::is_finite_positive(params.morchin.sin_psi_floor)) {
         error = "Morchin params are invalid.";
         return false;
     }
@@ -363,9 +363,9 @@ bool SeaClutterModel::resolve_ground_range(const RadarSystemParams& system,
                                            Scalar& out_ground_range_max_m,
                                            std::string& error) const {
     out_ground_range_min_m =
-        (params_.params.ground_range_min_m < 0.0) ? system.min_range_m : params_.params.ground_range_min_m;
+        (params_.ground_range_min_m < 0.0) ? system.min_range_m : params_.ground_range_min_m;
     out_ground_range_max_m =
-        (params_.params.ground_range_max_m < 0.0) ? system.max_range_m : params_.params.ground_range_max_m;
+        (params_.ground_range_max_m < 0.0) ? system.max_range_m : params_.ground_range_max_m;
     if (out_ground_range_min_m < 0.0 ||
         out_ground_range_max_m <= out_ground_range_min_m) {
         error = "resolved ground range bounds are invalid.";
@@ -376,12 +376,12 @@ bool SeaClutterModel::resolve_ground_range(const RadarSystemParams& system,
 
 Scalar SeaClutterModel::morchin_sigma0_linear(Scalar grazing_rad, Scalar fc_hz) const {
     const Scalar sin_psi = std::max(std::sin(math::clamp_nonnegative(grazing_rad)),
-                                    params_.params.morchin.sin_psi_floor);
+                                    params_.morchin.sin_psi_floor);
     const Scalar fc_ghz = math::clamp_positive_eps(fc_hz * 1.0e-9);
-    const Scalar sigma0_db = params_.params.morchin.a0_db +
-                             params_.params.morchin.a_g * std::log10(sin_psi) +
-                             params_.params.morchin.a_f * std::log10(fc_ghz) +
-                             params_.params.morchin.a_s * params_.params.morchin.sea_state;
+    const Scalar sigma0_db = params_.morchin.a0_db +
+                             params_.morchin.a_g * std::log10(sin_psi) +
+                             params_.morchin.a_f * std::log10(fc_ghz) +
+                             params_.morchin.a_s * params_.morchin.sea_state;
     return math::clamp_positive_eps(math::db_to_linear(sigma0_db));
 }
 
@@ -471,7 +471,7 @@ ComplexVec SeaClutterModel::generate_sequence(std::size_t length,
                                                      Scalar doppler_center_hz,
                                                      Scalar doppler_sigma_hz,
                                                      Scalar k_shape_nu) const {
-    std::mt19937_64 rng(cell_seed(params_.options.seed, beam_index, range_index, az_index));
+    std::mt19937_64 rng(cell_seed(params_.seed, beam_index, range_index, az_index));
     const ComplexVec gaussian =
         generate_corr_sequence(length, prf_hz, doppler_center_hz, doppler_sigma_hz, rng);
     return apply_k_sirp(gaussian, k_shape_nu, rng);
@@ -483,7 +483,7 @@ ComplexVec SeaClutterModel::generate_sequence_pool(std::size_t pool_length,
                                                 Scalar doppler_center_hz,
                                                 Scalar doppler_sigma_hz,
                                                 Scalar k_shape_nu) const {
-    const uint64_t seed = mix_u64(params_.options.seed ^ static_cast<uint64_t>(beam_index) ^ kMixConst1);
+    const uint64_t seed = mix_u64(params_.seed ^ static_cast<uint64_t>(beam_index) ^ kMixConst1);
     std::mt19937_64 rng(seed);
     const ComplexVec gaussian = generate_corr_sequence(
         pool_length, prf_hz, doppler_center_hz, doppler_sigma_hz, rng);
@@ -498,11 +498,11 @@ std::vector<SeaClutterModel::CellInfo> SeaClutterModel::build_cells(
     Scalar ground_range_max_m,
     Scalar tau_ref_s) const {
     const Scalar antenna_height_m = math::clamp_nonnegative(system.antenna_height_m);
-    const Scalar d_az_rad = math::deg_to_rad(params_.params.az_step_deg);
+    const Scalar d_az_rad = math::deg_to_rad(params_.az_step_deg);
     const int az_count = std::max(
-        1, static_cast<int>(std::llround(params_.params.beam_az_width_deg / params_.params.az_step_deg)));
+        1, static_cast<int>(std::llround(params_.beam_az_width_deg / params_.az_step_deg)));
     const Scalar az_start_deg =
-        beam_pointing.azimuth - 0.5 * params_.params.beam_az_width_deg + 0.5 * params_.params.az_step_deg;
+        beam_pointing.azimuth - 0.5 * params_.beam_az_width_deg + 0.5 * params_.az_step_deg;
 
     const Scalar tx_power_w = math::clamp_positive_eps(system.peak_power_w);
     const Scalar lambda_m = math::clamp_positive_eps(system.wavelength_m);
@@ -511,19 +511,19 @@ std::vector<SeaClutterModel::CellInfo> SeaClutterModel::build_cells(
 
     std::vector<CellInfo> cells;
     int range_index = 0;
-    for (Scalar rg_m = ground_range_min_m + 0.5 * params_.params.range_step_m; rg_m < ground_range_max_m;
-         rg_m += params_.params.range_step_m, ++range_index) {
+    for (Scalar rg_m = ground_range_min_m + 0.5 * params_.range_step_m; rg_m < ground_range_max_m;
+         rg_m += params_.range_step_m, ++range_index) {
         const Scalar grazing_rad =
             std::atan2(antenna_height_m, math::clamp_positive_eps(rg_m));
         const Scalar slant_range_m = std::sqrt(antenna_height_m * antenna_height_m + rg_m * rg_m);
         const Scalar cell_area_m2 =
-            math::clamp_nonnegative(rg_m) * params_.params.range_step_m * d_az_rad;
+            math::clamp_nonnegative(rg_m) * params_.range_step_m * d_az_rad;
         const Scalar sigma0_linear = morchin_sigma0_linear(grazing_rad, system.fc_hz);
         const Scalar sigma_cell = sigma0_linear * cell_area_m2;
 
         for (int az_index = 0; az_index < az_count; ++az_index) {
             const Scalar azimuth_deg =
-                math::wrap_azimuth_deg(az_start_deg + static_cast<Scalar>(az_index) * params_.params.az_step_deg);
+                math::wrap_azimuth_deg(az_start_deg + static_cast<Scalar>(az_index) * params_.az_step_deg);
             const Scalar elevation_deg = -math::rad_to_deg(grazing_rad);
             const Scalar gain_linear =
                 antenna.gain(azimuth_deg, elevation_deg, beam_pointing.azimuth, beam_pointing.elevation);

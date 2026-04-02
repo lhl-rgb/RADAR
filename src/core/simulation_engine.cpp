@@ -142,7 +142,7 @@ bool SimulationEngine::initialize_engines() {
     SPDLOG_INFO("  Initial targets: {}", initial_targets_.size());
     SPDLOG_INFO("  UDP output: {}", config_.udp_output.enabled ? "enabled" : "disabled");
     SPDLOG_INFO("  Data export: {}", config_.data_export.enabled ? "enabled" : "disabled");
-    SPDLOG_INFO("  Clutter: {}", config_.clutter.options.enabled ? "enabled" : "disabled");
+    SPDLOG_INFO("  Clutter: {}", config_.clutter.enabled ? "enabled" : "disabled");
 
     initialized_ = true;
     return true;
@@ -236,7 +236,7 @@ void SimulationEngine::process_single_cpi(int cpi_index,
 
     // 生成杂波回波
     CpiEcho clutter_echo;
-    if (config_.clutter.options.enabled) {
+    if (config_.clutter.enabled) {
         clutter_engine_->generate_sea_clutter_cpi(
             config_.system, beam_scanner_->antenna_model(), beam_pointing, beam_index, tx_waveform, clutter_echo);
     }

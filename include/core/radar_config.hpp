@@ -138,17 +138,17 @@ inline bool RadarConfig::validate_cross_module(std::string& error) const {
 
     // Clutter doppler center within unambiguous range
     const Scalar clutter_nyquist_hz = 0.5 * system.prf_hz;
-    if (clutter.params.doppler_center_hz < -clutter_nyquist_hz ||
-        clutter.params.doppler_center_hz >= clutter_nyquist_hz) {
+    if (clutter.doppler_center_hz < -clutter_nyquist_hz ||
+        clutter.doppler_center_hz >= clutter_nyquist_hz) {
         error = "clutter doppler_center must be within [-prf/2, prf/2)";
         return false;
     }
 
     // Clutter range within radar range
     const Scalar clutter_range_min =
-        (clutter.params.ground_range_min_m < 0.0) ? system.min_range_m : clutter.params.ground_range_min_m;
+        (clutter.ground_range_min_m < 0.0) ? system.min_range_m : clutter.ground_range_min_m;
     const Scalar clutter_range_max =
-        (clutter.params.ground_range_max_m < 0.0) ? system.max_range_m : clutter.params.ground_range_max_m;
+        (clutter.ground_range_max_m < 0.0) ? system.max_range_m : clutter.ground_range_max_m;
     if (clutter_range_min < 0.0 || clutter_range_max <= clutter_range_min) {
         error = "clutter range invalid (min >= 0, max > min)";
         return false;
@@ -167,10 +167,10 @@ inline void RadarConfig::print() const {
     system.print();
     SPDLOG_INFO("");
     SPDLOG_INFO("--- WaveformConfig ---");
-    SPDLOG_INFO("  waveform_type: {}", static_cast<int>(waveform.options.waveform_type));
-    SPDLOG_INFO("  phase_code_type: {}", static_cast<int>(waveform.options.phase_code_type));
-    SPDLOG_INFO("  nlfm_window_type: {}", static_cast<int>(waveform.options.nlfm_window_type));
-    SPDLOG_INFO("  polarization: {}", static_cast<int>(waveform.options.polarization));
+    SPDLOG_INFO("  waveform_type: {}", static_cast<int>(waveform.waveform_type));
+    SPDLOG_INFO("  phase_code_type: {}", static_cast<int>(waveform.phase_code_type));
+    SPDLOG_INFO("  nlfm_window_type: {}", static_cast<int>(waveform.nlfm_window_type));
+    SPDLOG_INFO("  polarization: {}", static_cast<int>(waveform.polarization));
     SPDLOG_INFO("");
     SPDLOG_INFO("--- AntennaConfig ---");
     SPDLOG_INFO("  model_type: {}", static_cast<int>(antenna.model_type));
@@ -187,14 +187,14 @@ inline void RadarConfig::print() const {
     SPDLOG_INFO("  beam_count: {}", this->beam_table.beams.size());
     SPDLOG_INFO("");
     SPDLOG_INFO("--- NoiseConfig ---");
-    SPDLOG_INFO("  mode: {}", static_cast<int>(noise.options.mode));
-    SPDLOG_INFO("  sigma_complex: {}", noise.params.sigma_complex);
-    SPDLOG_INFO("  seed: {}", noise.options.seed);
+    SPDLOG_INFO("  mode: {}", static_cast<int>(noise.mode));
+    SPDLOG_INFO("  sigma_complex: {}", noise.sigma_complex);
+    SPDLOG_INFO("  seed: {}", noise.seed);
     SPDLOG_INFO("");
     SPDLOG_INFO("--- SeaClutterConfig ---");
-    SPDLOG_INFO("  enabled: {}", clutter.options.enabled ? "true" : "false");
-    SPDLOG_INFO("  k_shape_nu: {}", clutter.params.k_shape_nu);
-    SPDLOG_INFO("  morchin.sea_state: {}", clutter.params.morchin.sea_state);
+    SPDLOG_INFO("  enabled: {}", clutter.enabled ? "true" : "false");
+    SPDLOG_INFO("  k_shape_nu: {}", clutter.k_shape_nu);
+    SPDLOG_INFO("  morchin.sea_state: {}", clutter.morchin.sea_state);
     SPDLOG_INFO("");
     SPDLOG_INFO("--- TargetConfig ---");
     SPDLOG_INFO("  enabled: {}", target.enabled ? "true" : "false");
