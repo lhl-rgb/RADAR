@@ -60,9 +60,12 @@ public:
 
     /**
      * @brief 初始化目标引擎
+     * @details
+     * - 如果没有设置初始目标，自动生成默认目标
+     * - 将目标设置到 TargetManager
      * @return 如果初始化成功返回 true
      */
-    bool initialize() { initialized_ = true; return true; }
+    bool initialize();
 
     /**
      * @brief 检查是否已初始化
@@ -153,6 +156,11 @@ public:
      */
     const TargetConfig& config() const { return cfg_; }
 
+    /**
+     * @brief 获取初始目标列表
+     */
+    const TargetList& initial_targets() const { return initial_targets_; }
+
 private:
     /**
      * @brief 初始化输出回波结构
@@ -167,7 +175,14 @@ private:
                           CpiEcho& out_echo,
                           std::string& error) const;
 
+    /**
+     * @brief 生成默认目标列表
+     * @return 默认目标状态列表
+     */
+    TargetList generate_default_targets() const;
+
     TargetConfig cfg_;
+    TargetList initial_targets_;       ///< 初始目标列表
     bool initialized_ = false;
     std::string last_error_;
 

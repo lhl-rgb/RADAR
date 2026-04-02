@@ -11,11 +11,31 @@
 namespace radar::target {
 
 // ============================================================================
+// 初始化
+// ============================================================================
+
+bool TargetEngine::initialize() {
+    // 如果没有设置初始目标，生成默认目标
+    if (initial_targets_.empty()) {
+        initial_targets_ = generate_default_targets();
+    }
+
+    // 设置目标到管理器
+    target_manager_.set_targets(initial_targets_);
+
+    initialized_ = true;
+    return true;
+}
+
+// ============================================================================
 // 目标状态管理（委托给 TargetManager）
 // ============================================================================
 
 void TargetEngine::set_initial_targets(const TargetList& targets) {
-    target_manager_.set_targets(targets);
+    initial_targets_ = targets;
+    if (initialized_) {
+        target_manager_.set_targets(targets);
+    }
 }
 
 void TargetEngine::update_targets(Scalar current_time_s) {
@@ -104,6 +124,19 @@ CpiEcho TargetEngine::generate_or_throw(const BeamView& beam,
         throw std::runtime_error(last_error_);
     }
     return echo;
+}
+
+// ============================================================================
+// 内部实现
+// ============================================================================
+
+TargetList TargetEngine::generate_default_targets() const {
+    return {
+        {1, Vec3(50000.0, 0.0, 5000.0), Vec3::Zero(), Vec3::Zero(),
+         MotionModel::Stationary, 10.0, SwerlingType::Swerling1, true},
+        {2, Vec3(30000.0, 10000.0, 3000.0), Vec3(100.0, 50.0, 0.0), Vec3::Zero(),
+         MotionModel::ConstantVelocity, 5.0, SwerlingType::Swerling1, true}
+    };
 }
 
 }  // namespace radar::target

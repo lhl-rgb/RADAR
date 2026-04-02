@@ -42,7 +42,7 @@ struct MorchinConfig {
  */
 struct ClutterOptions {
     bool enabled = true;                            ///< 是否启用海杂波
-    SeaClutterSequenceMode sequence_mode = SeaClutterSequenceMode::InTimeMode; ///< 慢时间序列生成策略
+    SeaClutterSequenceMode sequence_mode = SeaClutterSequenceMode::SequencePoolMode; ///< 慢时间序列生成策略
     uint64_t seed = 2026;                           ///< 随机种子
 };
 

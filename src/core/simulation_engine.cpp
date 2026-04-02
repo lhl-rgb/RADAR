@@ -94,18 +94,13 @@ bool SimulationEngine::initialize_engines() {
         return false;
     }
 
-    // 5. 设置初始目标状态（通过 TargetEngine 管理）
-    if (config_.initial_targets.empty()) {
-        initial_targets_ = {
-            {1, Vec3(50000.0, 0.0, 5000.0), Vec3::Zero(), Vec3::Zero(),
-             MotionModel::Stationary, 10.0, SwerlingType::Swerling1, true},
-            {2, Vec3(30000.0, 10000.0, 3000.0), Vec3(100.0, 50.0, 0.0), Vec3::Zero(),
-             MotionModel::ConstantVelocity, 5.0, SwerlingType::Swerling1, true}
-        };
-    } else {
+    // 5. 设置初始目标（如果配置为空，TargetEngine 会自动生成默认目标）
+    if (!config_.initial_targets.empty()) {
         initial_targets_ = config_.initial_targets;
+        target_engine_->set_initial_targets(initial_targets_);
+    } else {
+        initial_targets_ = target_engine_->initial_targets();
     }
-    target_engine_->set_initial_targets(initial_targets_);
 
     // 6. 初始化波束扫描控制器
     beam_scanner_ = std::make_unique<antenna::BeamScanner>();
