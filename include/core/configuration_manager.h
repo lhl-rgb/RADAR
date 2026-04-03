@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "radar_config.hpp"
+#include "radar_config.h"
 #include <functional>
 #include <map>
 #include <memory>

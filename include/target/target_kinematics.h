@@ -6,8 +6,8 @@
 #pragma once
 
 #include "antenna/antenna_model.h"
-#include "core/radar_system_params.hpp"
-#include "target/target_config.hpp"
+#include "core/radar_system_params.h"
+#include "target/target_config.h"
 #include <string>
 
 namespace radar::target {
@@ -19,7 +19,7 @@ using radar::antenna::AntennaModel;
  * @details 包含波束指向角度、波位索引和天线指针
  */
 struct BeamView {
-    AzEl pointing{};                               ///< 波束指向（方位、仰角）
+    BeamPoint pointing{};                         ///< 波束指向（方位、仰角）
     int beam_index = 0;                            ///< 波位索引
     const AntennaModel* antenna = nullptr;  ///< 天线指针（用于获取增益等信息）
 };

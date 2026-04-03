@@ -6,8 +6,8 @@
 #pragma once
 
 #include "antenna/antenna_model.h"
-#include "clutter/sea_clutter_config.hpp"
-#include "core/radar_system_params.hpp"
+#include "clutter/sea_clutter_config.h"
+#include "core/radar_system_params.h"
 #include "core/types.h"
 
 #include <cstddef>
@@ -25,6 +25,8 @@ using radar::antenna::AntennaModel;
  * 采用"双层建模"：
  * 1) 几何/平均功率层：按地距-方位扇形网格计算单元平均接收功率；
  * 2) 统计起伏层：按 K 分布（SIRP）和高斯多普勒谱生成慢时间复序列。
+ *
+ * 序列池模式：预先生成大杂波池，每次CPI从池中随机截取一段，提高效率。
  */
 class SeaClutterModel {
 public:
@@ -48,6 +50,15 @@ public:
     const std::string& last_error() const { return last_error_; }
 
     /**
+     * @brief 初始化或更新杂波池
+     * @param system 雷达系统参数（用于确定池大小和PRF）
+     * @param num_beams 总波位数（用于确定需要的池大小）
+     * @return 成功返回 true
+     * @details 在SequencePoolMode下，预先生成杂波池缓存到内存
+     */
+    bool initialize_pool(const RadarSystemParams& system, int num_beams = 1);
+
+    /**
      * @brief 生成一个 CPI 的海杂波原始回波矩阵（clutter-only）
      * @param system 雷达系统参数
      * @param antenna 当前使用的天线模型
@@ -59,7 +70,7 @@ public:
      */
     bool generate_cpi(const RadarSystemParams& system,
                       const AntennaModel& antenna,
-                      const AzEl& beam_pointing,
+                      const BeamPoint& beam_pointing,
                       int beam_index,
                       const ComplexVec& tx_waveform,
                       CpiEcho& out_clutter);
@@ -76,8 +87,20 @@ private:
         int start_sample_index = 0;
     };
 
+    /// 杂波池缓存参数
+    struct PoolCache {
+        ComplexVec sequence;        ///< 预生成的杂波序列池
+        Scalar prf_hz = 0.0;        ///< 生成时的PRF
+        Scalar doppler_center_hz = 0.0;  ///< 生成时的多普勒中心
+        Scalar doppler_sigma_hz = 0.0;   ///< 生成时的多普勒带宽
+        Scalar k_shape_nu = 0.0;    ///< 生成时的K分布形状参数
+        int pulses_per_cpi = 0;     ///< 生成时的每CPI脉冲数
+        bool valid = false;         ///< 是否有效
+    };
+
     SeaClutterConfig params_;
     std::string last_error_;
+    PoolCache pool_cache_;  ///< 杂波池缓存
 
     static bool validate_params(const SeaClutterConfig& params, std::string& error);
     static bool validate_doppler_center_nyquist(Scalar doppler_center_hz,
@@ -108,14 +131,29 @@ private:
                                   Scalar doppler_sigma_hz,
                                   Scalar k_shape_nu) const;
 
-    ComplexVec generate_sequence_pool(std::size_t pool_length, int beam_index,
+    ComplexVec generate_sequence_pool(std::size_t pool_length,
                                        Scalar prf_hz, Scalar doppler_center_hz,
                                        Scalar doppler_sigma_hz,
                                        Scalar k_shape_nu) const;
 
+    /// 检查杂波池是否需要更新
+    bool pool_needs_update(const RadarSystemParams& system) const;
+
+    /// 从杂波池中截取一段序列
+    ComplexVec extract_from_pool(int beam_index, int range_index, int az_index,
+                                  std::size_t length) const;
+
+    /// 生成CPI杂波 - SampleGrid模式（简化，按采样点划分）
+    bool generate_cpi_sample_grid(const RadarSystemParams& system,
+                                   const AntennaModel& antenna,
+                                   const BeamPoint& beam_pointing,
+                                   int beam_index,
+                                   const ComplexVec& tx_waveform,
+                                   CpiEcho& out_clutter);
+
     std::vector<CellInfo> build_cells(const RadarSystemParams& system,
                                        const AntennaModel& antenna,
-                                       const AzEl& beam_pointing,
+                                       const BeamPoint& beam_pointing,
                                        Scalar ground_range_min_m,
                                        Scalar ground_range_max_m,
                                        Scalar tau_ref_s) const;

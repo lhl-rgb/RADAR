@@ -31,7 +31,7 @@ bool ClutterEngine::initialize() {
 
 bool ClutterEngine::generate_sea_clutter_cpi(const RadarSystemParams& system,
                                              const antenna::AntennaModel& antenna,
-                                             const AzEl& beam_pointing,
+                                             const BeamPoint& beam_pointing,
                                              int beam_index,
                                              const ComplexVec& tx_waveform,
                                              CpiEcho& out_clutter) {

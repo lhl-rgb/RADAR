@@ -61,7 +61,7 @@ bool SimulationEngine::initialize_engines() {
     config_.sync_udp_config();
 
     // 1. 初始化波形生成器
-    waveform_gen_ = std::make_unique<WaveformGenerator>();
+    waveform_gen_ = std::make_unique<waveform::WaveformGenerator>();
     waveform_gen_->set_config(config_.waveform);
     waveform_gen_->set_system_params(config_.system);
     if (!waveform_gen_->initialize()) {
@@ -213,12 +213,12 @@ void SimulationEngine::process_single_cpi(int cpi_index,
                                            std::vector<CpiEcho>& scan_cpi_echos,
                                            std::vector<TargetList>& scan_target_snapshots) {
     // 获取当前波位
-    AzEl beam_pointing = beam_scanner_->get_beam_pointing();
+    BeamPoint beam_pointing = beam_scanner_->get_beam_pointing();
     int beam_index = static_cast<int>(beam_scanner_->get_beam_index());
 
     SPDLOG_DEBUG("[CPI {}/{}] Beam {} (az={:.1f}°, el={:.1f}°)",
                  cpi_index + 1, total_cpi_count_, beam_index,
-                 beam_pointing.azimuth, beam_pointing.elevation);
+                 beam_pointing.azimuth_deg, beam_pointing.elevation_deg);
 
     // 更新目标状态到当前时刻（通过 TargetEngine 管理）
     target_engine_->update_targets(current_time);
@@ -244,8 +244,8 @@ void SimulationEngine::process_single_cpi(int cpi_index,
     // 合成总回波（目标 + 杂波）
     CpiEcho total_echo;
     total_echo.beam_index = beam_index;
-    total_echo.azimuth_deg = beam_pointing.azimuth;
-    total_echo.elevation_deg = beam_pointing.elevation;
+    total_echo.azimuth_deg = beam_pointing.azimuth_deg;
+    total_echo.elevation_deg = beam_pointing.elevation_deg;
     total_echo.pulses.assign(
         static_cast<std::size_t>(config_.system.pulses_per_cpi),
         PulseEcho(static_cast<std::size_t>(config_.system.samples_per_pulse), Complex(0.0, 0.0)));

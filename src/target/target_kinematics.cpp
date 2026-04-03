@@ -184,10 +184,10 @@ bool TargetKinematics::generate_trajectory(const TargetState& target,
             Scalar el_deg = 0.0;
             math::to_az_el_deg(snapshot.position_m, az_deg, el_deg);
             if (config.skip_out_of_beam_targets && !beam.antenna->is_target_in_beam(az_deg, el_deg,
-                beam.pointing.azimuth, beam.pointing.elevation, config.beam_gate_threshold_db)) {
+                beam.pointing.azimuth_deg, beam.pointing.elevation_deg, config.beam_gate_threshold_db)) {
                 snapshot.gain_linear = 0.0;
             } else {
-                snapshot.gain_linear = beam.antenna->gain(az_deg, el_deg, beam.pointing.azimuth, beam.pointing.elevation);
+                snapshot.gain_linear = beam.antenna->gain(az_deg, el_deg, beam.pointing.azimuth_deg, beam.pointing.elevation_deg);
             }
         }
 

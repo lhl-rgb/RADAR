@@ -14,8 +14,8 @@
 #pragma once
 
 #include "core/types.h"
-#include "core/radar_system_params.hpp"
-#include "clutter/sea_clutter_config.hpp"
+#include "core/radar_system_params.h"
+#include "clutter/sea_clutter_config.h"
 #include "clutter/sea_clutter_model.h"
 #include "antenna/antenna_model.h"
 
@@ -92,7 +92,7 @@ public:
      */
     bool generate_sea_clutter_cpi(const RadarSystemParams& system,
                                   const antenna::AntennaModel& antenna,
-                                  const AzEl& beam_pointing,
+                                  const BeamPoint& beam_pointing,
                                   int beam_index,
                                   const ComplexVec& tx_waveform,
                                   CpiEcho& out_clutter);

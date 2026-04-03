@@ -70,8 +70,8 @@ bool TargetEngine::init_output_echo(const BeamView& beam,
     }
 
     out_echo.beam_index = beam.beam_index;
-    out_echo.azimuth_deg = beam.pointing.azimuth;
-    out_echo.elevation_deg = beam.pointing.elevation;
+    out_echo.azimuth_deg = beam.pointing.azimuth_deg;
+    out_echo.elevation_deg = beam.pointing.elevation_deg;
     out_echo.pulses.assign(static_cast<std::size_t>(system.pulses_per_cpi),
                            PulseEcho(static_cast<std::size_t>(system.samples_per_pulse), Complex(0.0, 0.0)));
     return true;
