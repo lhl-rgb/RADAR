@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "core/radar_config.hpp"
+#include "core/radar_config.h"
 #include "core/types.h"
 
 #include "antenna/antenna_model.h"
@@ -230,7 +230,7 @@ private:
     std::thread run_thread_;                    ///< 异步运行线程
 
     // 子引擎
-    std::unique_ptr<WaveformGenerator> waveform_gen_;           ///< 波形生成器
+    std::unique_ptr<waveform::WaveformGenerator> waveform_gen_;           ///< 波形生成器
     std::unique_ptr<noise::NoiseEngine> noise_engine_;          ///< 噪声引擎
     std::unique_ptr<clutter::ClutterEngine> clutter_engine_;    ///< 杂波引擎
     std::unique_ptr<target::TargetEngine> target_engine_;       ///< 目标引擎（统一管理器）

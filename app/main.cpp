@@ -65,8 +65,16 @@ int main() {
 
     // 获取可执行文件所在目录，向上找到项目根目录
     // 可执行文件路径：project_root/out/bin/radar
+    // project_root = out/bin/../../ = out/..
     std::filesystem::path exe_path = std::filesystem::canonical("/proc/self/exe");
-    std::filesystem::path project_root = exe_path.parent_path().parent_path().parent_path();
+    std::filesystem::path project_root = exe_path.parent_path().parent_path();
+
+    // 检查是否在 out/bin 目录下，如果是则再向上一级
+    if (exe_path.parent_path().filename() == "bin" &&
+        exe_path.parent_path().parent_path().filename() == "out") {
+        project_root = exe_path.parent_path().parent_path().parent_path();
+    }
+
     std::string config_path = (project_root / "config" / "radar_config.json").string();
 
     if (!std::filesystem::exists(config_path)) {
@@ -82,7 +90,11 @@ int main() {
 
     SPDLOG_INFO("Config loaded from: {}", config_path);
 
+    // 设置数据导出目录为项目根目录下的 data/
     radar::RadarConfig& config = config_manager.mutable_config();
+    if (!std::filesystem::path(config.data_export.output_dir).is_absolute()) {
+        config.data_export.output_dir = (project_root / "data").string();
+    }
     config.compute_derived_params();
 
     // 配置验证

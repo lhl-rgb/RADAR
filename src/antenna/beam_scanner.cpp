@@ -60,7 +60,7 @@ bool BeamScanner::initialize() {
         else if (!beam_table_config_.beams.empty()) {
             BeamTable table;
             for (const auto& beam : beam_table_config_.beams) {
-                table.push_back({beam.azimuth, beam.elevation});
+                table.push_back({beam.azimuth_deg, beam.elevation_deg});
             }
             set_beam_table(table);
         }
@@ -155,10 +155,9 @@ bool BeamScanner::advance_one_cpi() {
 
 void BeamScanner::reset() {
     current_beam_index_ = 0;
-    beam_table_.clear();
 }
 
-AzEl BeamScanner::get_beam_pointing() const {
+BeamPoint BeamScanner::get_beam_pointing() const {
     if (beam_table_.empty()) {
         return {0.0, 0.0};
     }
@@ -170,8 +169,8 @@ Scalar BeamScanner::get_gain_to_target(Scalar target_az_deg, Scalar target_el_de
     if (beam_table_.empty()) {
         throw std::runtime_error(kEmptyBeamTableError);
     }
-    const AzEl beam = get_beam_pointing();
-    return antenna_model_.gain(target_az_deg, target_el_deg, beam.azimuth, beam.elevation);
+    const BeamPoint beam = get_beam_pointing();
+    return antenna_model_.gain(target_az_deg, target_el_deg, beam.azimuth_deg, beam.elevation_deg);
 }
 
 Scalar BeamScanner::get_gain_db_to_target(Scalar target_az_deg,
@@ -179,8 +178,8 @@ Scalar BeamScanner::get_gain_db_to_target(Scalar target_az_deg,
     if (beam_table_.empty()) {
         throw std::runtime_error(kEmptyBeamTableError);
     }
-    const AzEl beam = get_beam_pointing();
-    return antenna_model_.gain_db(target_az_deg, target_el_deg, beam.azimuth, beam.elevation);
+    const BeamPoint beam = get_beam_pointing();
+    return antenna_model_.gain_db(target_az_deg, target_el_deg, beam.azimuth_deg, beam.elevation_deg);
 }
 
 Scalar BeamScanner::get_normalized_power_to_target(Scalar target_az_deg,
@@ -188,9 +187,9 @@ Scalar BeamScanner::get_normalized_power_to_target(Scalar target_az_deg,
     if (beam_table_.empty()) {
         throw std::runtime_error(kEmptyBeamTableError);
     }
-    const AzEl beam = get_beam_pointing();
+    const BeamPoint beam = get_beam_pointing();
     return antenna_model_.normalized_power(target_az_deg, target_el_deg,
-                                           beam.azimuth, beam.elevation);
+                                           beam.azimuth_deg, beam.elevation_deg);
 }
 
 bool BeamScanner::is_target_in_beam(Scalar target_az_deg, Scalar target_el_deg,
@@ -198,9 +197,9 @@ bool BeamScanner::is_target_in_beam(Scalar target_az_deg, Scalar target_el_deg,
     if (beam_table_.empty()) {
         throw std::runtime_error(kEmptyBeamTableError);
     }
-    const AzEl beam = get_beam_pointing();
+    const BeamPoint beam = get_beam_pointing();
     return antenna_model_.is_target_in_beam(target_az_deg, target_el_deg,
-                                            beam.azimuth, beam.elevation, threshold_db);
+                                            beam.azimuth_deg, beam.elevation_deg, threshold_db);
 }
 
 }  // namespace radar::antenna

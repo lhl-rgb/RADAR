@@ -14,13 +14,13 @@ namespace radar::antenna {
 
 void AntennaModel::set_config(const AntennaConfig& config) {
     config_ = config;
-
+    // 参数保护，确保阵元数和间距合理
     config_.num_elements_az = std::max(config_.num_elements_az, 1);
     config_.num_elements_el = std::max(config_.num_elements_el, 1);
     config_.spacing_az_lambda = math::clamp_positive_eps(config_.spacing_az_lambda);
     config_.spacing_el_lambda = math::clamp_positive_eps(config_.spacing_el_lambda);
 
-    refresh_internal_cache();
+    refresh_internal_cache();// 刷新内部缓存（权重向量、峰值增益等）
 }
 
 void AntennaModel::refresh_internal_cache() {

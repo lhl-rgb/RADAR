@@ -27,7 +27,7 @@ struct BeamTableConfig {
     Scalar elevation_deg = 0.0;          ///< 固定俯仰角（度）
 
     // 自定义波位列表（直接在 JSON 中定义）
-    std::vector<AzEl> beams;             ///< 波位表数据
+    BeamTable beams;             ///< 波位表数据
 };
 
 // JSON 序列化支持
@@ -72,7 +72,7 @@ inline void to_json(nlohmann::json& j, const BeamTableConfig& cfg) {
     if (!cfg.beams.empty()) {
         j["beams"] = nlohmann::json::array();
         for (const auto& beam : cfg.beams) {
-            j["beams"].push_back({{"azimuth", beam.azimuth}, {"elevation", beam.elevation}});
+            j["beams"].push_back({{"azimuth", beam.azimuth_deg}, {"elevation", beam.elevation_deg}});
         }
     }
 }
@@ -102,32 +102,47 @@ struct AntennaConfig {
     bool validate(std::string& error) const;
 };
 
-inline bool AntennaConfig::validate(std::string& error) const {
-    if (num_elements_az <= 0) {
-        error = "num_elements_az must be positive";
-        return false;
-    }
-    if (spacing_az_lambda <= 0.0) {
-        error = "spacing_az_lambda must be positive";
-        return false;
-    }
-    if (peak_gain_db < 0.0) {
-        error = "peak_gain_db cannot be negative";
-        return false;
+// JSON 序列化支持
+inline void from_json(const nlohmann::json& j, AntennaConfig& cfg) {
+    // 支持扁平化格式（向后兼容）
+    if (j.contains("model_type")) j.at("model_type").get_to(cfg.model_type);
+    if (j.contains("weight_type_az")) j.at("weight_type_az").get_to(cfg.weight_type_az);
+    if (j.contains("weight_type_el")) j.at("weight_type_el").get_to(cfg.weight_type_el);
+    if (j.contains("num_elements_az")) j.at("num_elements_az").get_to(cfg.num_elements_az);
+    if (j.contains("num_elements_el")) j.at("num_elements_el").get_to(cfg.num_elements_el);
+    if (j.contains("spacing_az_lambda")) j.at("spacing_az_lambda").get_to(cfg.spacing_az_lambda);
+    if (j.contains("spacing_el_lambda")) j.at("spacing_el_lambda").get_to(cfg.spacing_el_lambda);
+    if (j.contains("peak_gain_db")) j.at("peak_gain_db").get_to(cfg.peak_gain_db);
+
+    // 支持嵌套格式（新格式）
+    if (j.contains("options")) {
+        const auto& opts = j.at("options");
+        if (opts.contains("model_type")) opts.at("model_type").get_to(cfg.model_type);
+        if (opts.contains("weight_type_az")) opts.at("weight_type_az").get_to(cfg.weight_type_az);
+        if (opts.contains("weight_type_el")) opts.at("weight_type_el").get_to(cfg.weight_type_el);
     }
 
-    if (model_type == PhasedArrayModelType::UPA_2D) {
-        if (num_elements_el <= 0) {
-            error = "num_elements_el must be positive for UPA_2D model";
-            return false;
-        }
-        if (spacing_el_lambda <= 0.0) {
-            error = "spacing_el_lambda must be positive for UPA_2D model";
-            return false;
-        }
+    if (j.contains("params")) {
+        const auto& params = j.at("params");
+        if (params.contains("num_elements_az")) params.at("num_elements_az").get_to(cfg.num_elements_az);
+        if (params.contains("num_elements_el")) params.at("num_elements_el").get_to(cfg.num_elements_el);
+        if (params.contains("spacing_az_lambda")) params.at("spacing_az_lambda").get_to(cfg.spacing_az_lambda);
+        if (params.contains("spacing_el_lambda")) params.at("spacing_el_lambda").get_to(cfg.spacing_el_lambda);
+        if (params.contains("peak_gain_db")) params.at("peak_gain_db").get_to(cfg.peak_gain_db);
     }
-
-    return true;
 }
 
-} // namespace radar::antenna
+inline void to_json(nlohmann::json& j, const AntennaConfig& cfg) {
+    j = nlohmann::json{
+        {"model_type", cfg.model_type},
+        {"weight_type_az", cfg.weight_type_az},
+        {"weight_type_el", cfg.weight_type_el},
+        {"num_elements_az", cfg.num_elements_az},
+        {"num_elements_el", cfg.num_elements_el},
+        {"spacing_az_lambda", cfg.spacing_az_lambda},
+        {"spacing_el_lambda", cfg.spacing_el_lambda},
+        {"peak_gain_db", cfg.peak_gain_db}
+    };
+}
+
+}  // namespace radar::antenna

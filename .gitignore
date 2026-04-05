@@ -21,6 +21,10 @@ CTestTestfile.cmake
 *.dll
 *.exe
 
+# Runtime generated directories
+data/
+matlab/
+
 # IDE/editor
 .vscode/
 .idea/

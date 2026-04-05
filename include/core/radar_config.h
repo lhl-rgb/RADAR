@@ -8,13 +8,13 @@
 
 #include <spdlog/spdlog.h>
 
-#include "antenna/antenna_config.hpp"
+#include "antenna/antenna_config.h"
 #include "antenna/beam_scanner.h"
-#include "clutter/sea_clutter_config.hpp"
-#include "core/radar_system_params.hpp"
-#include "noise/noise_config.hpp"
-#include "target/target_config.hpp"
-#include "waveform/waveform_config.hpp"
+#include "clutter/sea_clutter_config.h"
+#include "core/radar_system_params.h"
+#include "noise/noise_config.h"
+#include "target/target_config.h"
+#include "waveform/waveform_config.h"
 #include "core/data_exporter.h"
 #include "core/udp/udp_config.h"
 #include "core/udp/udp_sender.h"
@@ -194,7 +194,7 @@ inline void RadarConfig::print() const {
     SPDLOG_INFO("--- SeaClutterConfig ---");
     SPDLOG_INFO("  enabled: {}", clutter.enabled ? "true" : "false");
     SPDLOG_INFO("  k_shape_nu: {}", clutter.k_shape_nu);
-    SPDLOG_INFO("  morchin.sea_state: {}", clutter.morchin.sea_state);
+    SPDLOG_INFO("  morchin_sea_state: {}", clutter.morchin_sea_state);
     SPDLOG_INFO("");
     SPDLOG_INFO("--- TargetConfig ---");
     SPDLOG_INFO("  enabled: {}", target.enabled ? "true" : "false");

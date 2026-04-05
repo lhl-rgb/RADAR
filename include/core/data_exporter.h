@@ -12,14 +12,15 @@
 #pragma once
 
 #include "core/types.h"
-#include "core/radar_system_params.hpp"
-#include "target/target_config.hpp"
+#include "core/radar_system_params.h"
+#include "target/target_config.h"
 #include "target/target_kinematics.h"
 
 #include <string>
 #include <vector>
 #include <fstream>
 #include <iomanip>
+#include <nlohmann/json.hpp>
 
 namespace radar::core {
 
@@ -27,12 +28,31 @@ namespace radar::core {
  * @brief 数据导出配置
  */
 struct ExportConfig {
-    bool enabled = true;                        ///< 是否启用数据导出
+    bool enabled = false;                        ///< 是否启用数据导出
     std::string output_dir = "output";          ///< 输出目录
     bool export_raw_echo_iq = true;             ///< 是否导出原始 IQ 数据 (dat 二进制格式)
     bool export_target_snapshots = true;        ///< 是否导出目标快照
     bool export_config_params = true;           ///< 是否导出配置参数
 };
+
+// JSON 序列化
+inline void from_json(const nlohmann::json& j, ExportConfig& cfg) {
+    if (j.contains("enabled")) j.at("enabled").get_to(cfg.enabled);
+    if (j.contains("output_dir")) j.at("output_dir").get_to(cfg.output_dir);
+    if (j.contains("export_raw_echo_iq")) j.at("export_raw_echo_iq").get_to(cfg.export_raw_echo_iq);
+    if (j.contains("export_target_snapshots")) j.at("export_target_snapshots").get_to(cfg.export_target_snapshots);
+    if (j.contains("export_config_params")) j.at("export_config_params").get_to(cfg.export_config_params);
+}
+
+inline void to_json(nlohmann::json& j, const ExportConfig& cfg) {
+    j = nlohmann::json{
+        {"enabled", cfg.enabled},
+        {"output_dir", cfg.output_dir},
+        {"export_raw_echo_iq", cfg.export_raw_echo_iq},
+        {"export_target_snapshots", cfg.export_target_snapshots},
+        {"export_config_params", cfg.export_config_params}
+    };
+}
 
 /**
  * @brief 单圈扫描数据
@@ -104,11 +124,6 @@ private:
      * @brief 确保目录存在
      */
     bool ensure_directory_exists(const std::string& path);
-
-    /**
-     * @brief 写入 JSON 文件
-     */
-    bool write_json_file(const std::string& filepath, const std::string& content);
 
     /**
      * @brief 写入 CSV 文件

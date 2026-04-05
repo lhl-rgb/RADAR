@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "antenna/antenna_config.hpp"
+#include "antenna/antenna_config.h"
 #include "antenna/antenna_model.h"
 #include "core/types.h"
 
@@ -152,7 +152,7 @@ public:
     /**
      * @brief 获取当前波位指向
      */
-    AzEl get_beam_pointing() const;
+    BeamPoint  get_beam_pointing() const;
 
     /**
      * @brief 获取当前波位索引

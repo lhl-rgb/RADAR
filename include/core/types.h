@@ -10,6 +10,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+#include <nlohmann/json.hpp>
 
 namespace radar {
 
@@ -227,6 +228,14 @@ enum class SeaClutterSequenceMode {
     SequencePoolMode  ///< 先生成长序列池，再按单元随机起点截取
 };
 
+/**
+ * @brief 海杂波网格划分模式
+ */
+enum class SeaClutterGridMode {
+    PhysicalGrid,   ///< 按物理分辨率划分（距离分辨率+方位），精度高
+    SampleGrid      ///< 直接按采样点划分，速度快，忽略方位变化
+};
+
 
 
 
@@ -273,5 +282,62 @@ struct TargetTrajectory {
     std::vector<TargetSnapshot> snapshots;
 };
 using TrajectoryBatch = std::vector<TargetTrajectory>;// 目标轨迹批次(CPI内所有目标轨迹）
+
+//=============================
+// JSON 序列化（inline 函数必须在头文件中）
+//=============================
+
+inline void from_json(const nlohmann::json& j, GeoCoord& coord) {
+    if (j.contains("latitude")) j.at("latitude").get_to(coord.latitude);
+    if (j.contains("longitude")) j.at("longitude").get_to(coord.longitude);
+    if (j.contains("altitude")) j.at("altitude").get_to(coord.altitude);
+}
+
+inline void to_json(nlohmann::json& j, const GeoCoord& coord) {
+    j = nlohmann::json{
+        {"latitude", coord.latitude},
+        {"longitude", coord.longitude},
+        {"altitude", coord.altitude}
+    };
+}
+
+inline void from_json(const nlohmann::json& j, TargetState& target) {
+    if (j.contains("id")) j.at("id").get_to(target.id);
+    if (j.contains("position_m")) {
+        const auto& pos = j.at("position_m");
+        if (pos.size() >= 3) {
+            target.position_m = Vec3(pos[0].get<Scalar>(), pos[1].get<Scalar>(), pos[2].get<Scalar>());
+        }
+    }
+    if (j.contains("velocity_mps")) {
+        const auto& vel = j.at("velocity_mps");
+        if (vel.size() >= 3) {
+            target.velocity_mps = Vec3(vel[0].get<Scalar>(), vel[1].get<Scalar>(), vel[2].get<Scalar>());
+        }
+    }
+    if (j.contains("acceleration_mps2")) {
+        const auto& acc = j.at("acceleration_mps2");
+        if (acc.size() >= 3) {
+            target.acceleration_mps2 = Vec3(acc[0].get<Scalar>(), acc[1].get<Scalar>(), acc[2].get<Scalar>());
+        }
+    }
+    if (j.contains("motion_model")) j.at("motion_model").get_to(target.motion_model);
+    if (j.contains("rcs_mean_m2")) j.at("rcs_mean_m2").get_to(target.rcs_mean_m2);
+    if (j.contains("swerling")) j.at("swerling").get_to(target.swerling);
+    if (j.contains("enabled")) j.at("enabled").get_to(target.enabled);
+}
+
+inline void to_json(nlohmann::json& j, const TargetState& target) {
+    j = nlohmann::json{
+        {"id", target.id},
+        {"position_m", {target.position_m.x(), target.position_m.y(), target.position_m.z()}},
+        {"velocity_mps", {target.velocity_mps.x(), target.velocity_mps.y(), target.velocity_mps.z()}},
+        {"acceleration_mps2", {target.acceleration_mps2.x(), target.acceleration_mps2.y(), target.acceleration_mps2.z()}},
+        {"motion_model", static_cast<int>(target.motion_model)},
+        {"rcs_mean_m2", target.rcs_mean_m2},
+        {"swerling", static_cast<int>(target.swerling)},
+        {"enabled", target.enabled}
+    };
+}
 
 } // namespace radar

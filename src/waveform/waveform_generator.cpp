@@ -10,7 +10,7 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace radar {
+namespace radar::waveform {
 
 namespace {
 
@@ -35,11 +35,11 @@ std::vector<int> barker_code(PhaseCodeType code_type) {
     }
 }
 
-int default_tx_samples(const RadarSystemParams& sys) {
+int samples_per_tx(const RadarSystemParams& sys) {
     if (sys.fs_hz <= 0.0 || sys.pulse_width_s <= 0.0) {
         return std::max(1, sys.samples_per_pulse);
     }
-    return std::max(1, static_cast<int>(std::ceil(sys.pulse_width_s * sys.fs_hz)));
+    return sys.samples_per_tx;
 }
 
 void normalize_average_power(ComplexVec& waveform) {
@@ -59,10 +59,7 @@ void normalize_average_power(ComplexVec& waveform) {
     }
 }
 
-Scalar invert_monotonic_linear(
-    const std::vector<Scalar>& x_monotonic,
-    const std::vector<Scalar>& y,
-    Scalar x_query) {
+Scalar invert_monotonic_linear(const ScalarVector& x_monotonic,const ScalarVector& y,Scalar x_query) {
     if (x_monotonic.empty() || y.empty() || x_monotonic.size() != y.size()) {
         return 0.0;
     }
@@ -94,7 +91,7 @@ bool WaveformGenerator::initialize() {
         return true;
     }
 
-    const int num_samples = default_tx_samples(sys_);
+    const int num_samples = samples_per_tx(sys_);// 发射信号长度（采样点数）
 
     switch (cfg_.waveform_type) {
     case WaveformType::LFM:
@@ -167,8 +164,8 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const {
 
     const int num_freq_samples = std::max(4096, 8 * num_samples);
 
-    std::vector<Scalar> freq_axis(static_cast<std::size_t>(num_freq_samples), 0.0);
-    std::vector<Scalar> weight(static_cast<std::size_t>(num_freq_samples), 1.0);
+    ScalarVector  freq_axis(static_cast<std::size_t>(num_freq_samples), 0.0);
+    ScalarVector  weight(static_cast<std::size_t>(num_freq_samples), 1.0);
 
     const auto window_weights = generate_window_weights(num_freq_samples, cfg_.nlfm_window_type);
 
@@ -181,7 +178,7 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const {
         weight[static_cast<std::size_t>(k)] = w * w;
     }
 
-    std::vector<Scalar> group_delay(static_cast<std::size_t>(num_freq_samples), 0.0);
+    ScalarVector  group_delay(static_cast<std::size_t>(num_freq_samples), 0.0);
 
     for (int k = 1; k < num_freq_samples; ++k) {
         const Scalar df = freq_axis[static_cast<std::size_t>(k)] -
@@ -204,7 +201,7 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const {
         tg = T * tg / integral_total;
     }
 
-    std::vector<Scalar> inst_freq(static_cast<std::size_t>(num_samples), 0.0);
+    ScalarVector  inst_freq(static_cast<std::size_t>(num_samples), 0.0);
     for (int n = 0; n < num_samples; ++n) {
         const Scalar t = (static_cast<Scalar>(n) + 0.5) * dt;
         const Scalar t_clamped = std::clamp(t, Scalar(0.0), T);
@@ -217,6 +214,10 @@ ComplexVec WaveformGenerator::generate_nlfm(int num_samples) const {
 
     for (int n = 0; n < num_samples; ++n) {
         phase += 2.0 * PI * inst_freq[static_cast<std::size_t>(n)] * dt;
+        // 定期归一化相位，避免数值累积误差
+        if (n % 256 == 0) {
+            phase = std::fmod(phase, 2.0 * PI);
+        }
         waveform[static_cast<std::size_t>(n)] = std::polar(1.0, phase);
     }
 
@@ -284,12 +285,12 @@ ComplexVec WaveformGenerator::generate_window(int length, WindowType type) const
     return window;
 }
 
-std::vector<Scalar> WaveformGenerator::generate_window_weights(int length, WindowType type) const {
+ScalarVector WaveformGenerator::generate_window_weights(int length, WindowType type) const {
     if (length <= 0) {
         return {};
     }
 
-    std::vector<Scalar> window(static_cast<std::size_t>(length), 1.0);
+    ScalarVector window(static_cast<std::size_t>(length), 1.0);
     if (length == 1) {
         return window;
     }

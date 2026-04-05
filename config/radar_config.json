@@ -24,65 +24,60 @@
     }
   },
   "waveform": {
-    "options": {
-      "waveform_type": 0,
-      "phase_code_type": 0,
-      "nlfm_window_type": 0,
-      "polarization": 0
-    }
+    "waveform_type": 0,
+    "phase_code_type": 0,
+    "nlfm_window_type": 0,
+    "polarization": 0
   },
   "antenna": {
-    "options": {
-      "model_type": 0,
-      "weight_type_az": 0,
-      "weight_type_el": 0
-    },
-    "params": {
-      "num_elements_az": 16,
-      "num_elements_el": 8,
-      "spacing_az_lambda": 0.5,
-      "spacing_el_lambda": 0.5,
-      "peak_gain_db": 30.0
-    }
+    "model_type": 0,
+    "weight_type_az": 0,
+    "weight_type_el": 0,
+    "num_elements_az": 16,
+    "num_elements_el": 8,
+    "spacing_az_lambda": 0.5,
+    "spacing_el_lambda": 0.5,
+    "peak_gain_db": 30.0
   },
   "noise": {
-    "options": {
-      "enabled": true,
-      "mode": 0,
-      "seed": 42
-    },
-    "params": {
-      "sigma_complex": 1.0
-    }
+    "enabled": true,
+    "mode": 0,
+    "seed": 42,
+    "sigma_complex": 1.0,
+    "noise_power_w": 1.0e-6,
+    "system_temperature_k": 290.0,
+    "noise_bandwidth_hz": 20.0e6
   },
   "clutter": {
-    "options": {
-      "enabled": true,
-      "sequence_mode": 0,
-      "seed": 2026
-    },
-    "params": {
-      "k_shape_nu": 4.5,
-      "doppler_center_hz": 0.0,
-      "doppler_sigma_hz": 50.0,
-      "ground_range_min_m": -1.0,
-      "ground_range_max_m": -1.0,
-      "morchin": {
-        "sea_state": 3
-      }
-    }
+    "enabled": true,
+    "sequence_mode": 0,
+    "grid_mode": 1,
+    "seed": 2026,
+    "ground_range_min_m": -1.0,
+    "ground_range_max_m": -1.0,
+    "range_step_m": 100.0,
+    "beam_az_width_deg": 3.0,
+    "az_step_deg": 0.1,
+    "k_shape_nu": 4.5,
+    "doppler_center_hz": 0.0,
+    "doppler_sigma_hz": 50.0,
+    "pool_length_factor": 32,
+    "morchin_a0_db": -40.0,
+    "morchin_a_g": 10.0,
+    "morchin_a_f": 0.0,
+    "morchin_a_s": 1.0,
+    "morchin_sea_state": 3.0,
+    "morchin_sin_psi_floor": 1e-4
   },
   "target": {
-    "options": {
-      "enabled": true,
-      "enable_swerling": true
-    },
-    "params": {
-      "enable_beam_gain": true,
-      "enable_two_way_propagation_loss": true,
-      "enable_phase": true,
-      "beam_gate_threshold_db": -20.0
-    }
+    "enabled": true,
+    "enable_swerling": true,
+    "skip_out_of_beam_targets": false,
+    "seed": 20260330,
+    "enable_beam_gain": true,
+    "enable_two_way_propagation_loss": true,
+    "enable_phase": true,
+    "beam_gate_threshold_db": -20.0
   },
   "beam_table": {
     "type": "azimuth_scan",
@@ -124,15 +119,10 @@
     }
   ],
   "data_export": {
-    "enabled": true,
-    "output_dir": "out/data",
+    "enabled": false,
+    "output_dir": "data",
     "export_raw_echo_iq": true,
     "export_target_snapshots": true,
     "export_config_params": true
-  },
-  "udp_output": {
-    "enabled": false,
-    "target_ip": "127.0.0.1",
-    "target_port": 9000
   }
 }

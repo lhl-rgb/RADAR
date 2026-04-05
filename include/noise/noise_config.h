@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <string>
+#include <nlohmann/json.hpp>
 
 namespace radar::noise {
 
@@ -48,29 +49,27 @@ struct NoiseConfig {
     bool validate(std::string& error) const;
 };
 
-inline bool NoiseConfig::validate(std::string& error) const {
-    if (mode == NoiseLevelMode::ComplexSigma) {
-        if (sigma_complex <= 0.0) {
-            error = "sigma_complex must be positive in ComplexSigma mode";
-            return false;
-        }
-    } else if (mode == NoiseLevelMode::NoisePower) {
-        if (noise_power_w <= 0.0) {
-            error = "noise_power_w must be positive in NoisePower mode";
-            return false;
-        }
-    } else if (mode == NoiseLevelMode::ThermalKTB) {
-        if (system_temperature_k <= 0.0) {
-            error = "system_temperature_k must be positive in ThermalKTB mode";
-            return false;
-        }
-        if (noise_bandwidth_hz <= 0.0) {
-            error = "noise_bandwidth_hz must be positive in ThermalKTB mode";
-            return false;
-        }
-    }
+// JSON 序列化支持
+inline void from_json(const nlohmann::json& j, NoiseConfig& cfg) {
+    if (j.contains("enabled")) j.at("enabled").get_to(cfg.enabled);
+    if (j.contains("mode")) j.at("mode").get_to(cfg.mode);
+    if (j.contains("seed")) j.at("seed").get_to(cfg.seed);
+    if (j.contains("sigma_complex")) j.at("sigma_complex").get_to(cfg.sigma_complex);
+    if (j.contains("noise_power_w")) j.at("noise_power_w").get_to(cfg.noise_power_w);
+    if (j.contains("system_temperature_k")) j.at("system_temperature_k").get_to(cfg.system_temperature_k);
+    if (j.contains("noise_bandwidth_hz")) j.at("noise_bandwidth_hz").get_to(cfg.noise_bandwidth_hz);
+}
 
-    return true;
+inline void to_json(nlohmann::json& j, const NoiseConfig& cfg) {
+    j = nlohmann::json{
+        {"enabled", cfg.enabled},
+        {"mode", cfg.mode},
+        {"seed", cfg.seed},
+        {"sigma_complex", cfg.sigma_complex},
+        {"noise_power_w", cfg.noise_power_w},
+        {"system_temperature_k", cfg.system_temperature_k},
+        {"noise_bandwidth_hz", cfg.noise_bandwidth_hz}
+    };
 }
 
 } // namespace radar::noise

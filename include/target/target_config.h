@@ -37,14 +37,6 @@ struct TargetConfig {
     bool validate(std::string& error) const;
 };
 
-inline bool TargetConfig::validate(std::string& error) const {
-    if (!math::is_finite(beam_gate_threshold_db)) {
-        error = "beam_gate_threshold_db must be finite";
-        return false;
-    }
-    return true;
-}
-
 // JSON 序列化支持
 inline void from_json(const nlohmann::json& j, TargetConfig& cfg) {
     // 支持扁平化格式（向后兼容）

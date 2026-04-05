@@ -8,6 +8,7 @@
 #include <sstream>
 #include <cmath>
 #include <cstdint>
+#include <nlohmann/json.hpp>
 
 namespace radar::core {
 
@@ -73,52 +74,61 @@ bool DataExporter::export_config_params(const RadarSystemParams& system,
                                          const TargetList& initial_targets) {
     std::string filepath = config_.output_dir + "/config_params.json";
 
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(6);
-    oss << "{\n";
-    oss << "  \"system_params\": {\n";
-    oss << "    \"fc_hz\": " << system.fc_hz << ",\n";
-    oss << "    \"prf_hz\": " << system.prf_hz << ",\n";
-    oss << "    \"pri_s\": " << system.pri_s << ",\n";
-    oss << "    \"bw_hz\": " << system.bw_hz << ",\n";
-    oss << "    \"pulse_width_s\": " << system.pulse_width_s << ",\n";
-    oss << "    \"fs_hz\": " << system.fs_hz << ",\n";
-    oss << "    \"pulses_per_cpi\": " << system.pulses_per_cpi << ",\n";
-    oss << "    \"samples_per_pulse\": " << system.samples_per_pulse << ",\n";
-    oss << "    \"wavelength_m\": " << system.wavelength_m << ",\n";
-    oss << "    \"max_unambiguous_range_m\": " << system.max_unambiguous_range_m << ",\n";
-    oss << "    \"range_resolution_m\": " << system.range_resolution_m << "\n";
-    oss << "  },\n";
+    nlohmann::json j;
 
-    oss << "  \"target_config\": {\n";
-    oss << "    \"enabled\": " << (target_config.enabled ? "true" : "false") << ",\n";
-    oss << "    \"enable_beam_gain\": " << (target_config.enable_beam_gain ? "true" : "false") << ",\n";
-    oss << "    \"enable_two_way_propagation_loss\": " << (target_config.enable_two_way_propagation_loss ? "true" : "false") << ",\n";
-    oss << "    \"enable_phase\": " << (target_config.enable_phase ? "true" : "false") << ",\n";
-    oss << "    \"enable_swerling\": " << (target_config.enable_swerling ? "true" : "false") << ",\n";
-    oss << "    \"seed\": " << target_config.seed << ",\n";
-    oss << "    \"beam_gate_threshold_db\": " << target_config.beam_gate_threshold_db << "\n";
-    oss << "  },\n";
+    // System parameters
+    j["system_params"] = {
+        {"fc_hz", system.fc_hz},
+        {"prf_hz", system.prf_hz},
+        {"pri_s", system.pri_s},
+        {"bw_hz", system.bw_hz},
+        {"pulse_width_s", system.pulse_width_s},
+        {"fs_hz", system.fs_hz},
+        {"pulses_per_cpi", system.pulses_per_cpi},
+        {"samples_per_pulse", system.samples_per_pulse},
+        {"wavelength_m", system.wavelength_m},
+        {"max_unambiguous_range_m", system.max_unambiguous_range_m},
+        {"range_resolution_m", system.range_resolution_m}
+    };
 
-    oss << "  \"initial_targets\": [\n";
-    for (std::size_t i = 0; i < initial_targets.size(); ++i) {
-        const auto& t = initial_targets[i];
-        oss << "    {\n";
-        oss << "      \"id\": " << t.id << ",\n";
-        oss << "      \"position_m\": [" << t.position_m.x() << ", " << t.position_m.y() << ", " << t.position_m.z() << "],\n";
-        oss << "      \"velocity_mps\": [" << t.velocity_mps.x() << ", " << t.velocity_mps.y() << ", " << t.velocity_mps.z() << "],\n";
-        oss << "      \"acceleration_mps2\": [" << t.acceleration_mps2.x() << ", " << t.acceleration_mps2.y() << ", " << t.acceleration_mps2.z() << "],\n";
-        oss << "      \"rcs_mean_m2\": " << t.rcs_mean_m2 << ",\n";
-        oss << "      \"swerling_type\": " << static_cast<int>(t.swerling) << ",\n";
-        oss << "      \"enabled\": " << (t.enabled ? "true" : "false") << "\n";
-        oss << "    }";
-        if (i < initial_targets.size() - 1) oss << ",";
-        oss << "\n";
+    // Target config
+    j["target_config"] = {
+        {"enabled", target_config.enabled},
+        {"enable_beam_gain", target_config.enable_beam_gain},
+        {"enable_two_way_propagation_loss", target_config.enable_two_way_propagation_loss},
+        {"enable_phase", target_config.enable_phase},
+        {"enable_swerling", target_config.enable_swerling},
+        {"seed", target_config.seed},
+        {"beam_gate_threshold_db", target_config.beam_gate_threshold_db}
+    };
+
+    // Initial targets
+    j["initial_targets"] = nlohmann::json::array();
+    for (const auto& t : initial_targets) {
+        nlohmann::json target_json;
+        target_json["id"] = t.id;
+        target_json["position_m"] = {t.position_m.x(), t.position_m.y(), t.position_m.z()};
+        target_json["velocity_mps"] = {t.velocity_mps.x(), t.velocity_mps.y(), t.velocity_mps.z()};
+        target_json["acceleration_mps2"] = {t.acceleration_mps2.x(), t.acceleration_mps2.y(), t.acceleration_mps2.z()};
+        target_json["rcs_mean_m2"] = t.rcs_mean_m2;
+        target_json["swerling_type"] = static_cast<int>(t.swerling);
+        target_json["enabled"] = t.enabled;
+        j["initial_targets"].push_back(target_json);
     }
-    oss << "  ]\n";
-    oss << "}\n";
 
-    return write_json_file(filepath, oss.str());
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            last_error_ = "Failed to open file: " + filepath;
+            return false;
+        }
+        file << j.dump(2);
+        file.close();
+        return true;
+    } catch (const std::exception& e) {
+        last_error_ = std::string("Failed to write JSON: ") + e.what();
+        return false;
+    }
 }
 
 bool DataExporter::export_target_trajectory(const std::vector<TargetList>& all_snapshots,
@@ -223,22 +233,6 @@ bool DataExporter::export_echo_iq_dat(const std::vector<CpiEcho>& cpi_echos,
         return true;
     } catch (const std::exception& e) {
         last_error_ = std::string("Failed to write DAT file: ") + e.what();
-        return false;
-    }
-}
-
-bool DataExporter::write_json_file(const std::string& filepath, const std::string& content) {
-    try {
-        std::ofstream file(filepath);
-        if (!file.is_open()) {
-            last_error_ = "Failed to open file: " + filepath;
-            return false;
-        }
-        file << content;
-        file.close();
-        return true;
-    } catch (const std::exception& e) {
-        last_error_ = std::string("Failed to write JSON: ") + e.what();
         return false;
     }
 }

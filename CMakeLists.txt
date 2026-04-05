@@ -3,14 +3,20 @@ cmake_minimum_required(VERSION 3.21)
 project(Radar VERSION 0.1.0 LANGUAGES CXX)
 
 # 输出目录配置 - 所有输出到项目根目录的 out/ 目录
+# bin/ 存放可执行文件，lib/ 存放静态库，build/ 存放编译中间文件
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/lib")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/bin")
 
+# 设置构建目录为 out/build
+set(CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}/out/build")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/out/bin")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/out/bin")
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(RADAR_ENABLE_CUDA "Enable CUDA support" ON)
-option(RADAR_BUILD_TESTS "Build test targets" OFF)
+option(RADAR_BUILD_TESTS "Build test targets" ON)
 
 if(RADAR_ENABLE_CUDA)
   include(CheckLanguage)
@@ -160,13 +166,22 @@ target_link_libraries(
 
 # 主程序
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app")
-  file(GLOB RADAR_APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/*.cpp")
-  if(RADAR_APP_SOURCES)
-    add_executable(radar_app ${RADAR_APP_SOURCES})
+  # 主雷达应用
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp")
+    add_executable(radar_app "${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp")
     target_include_directories(radar_app PRIVATE "${PROJECT_SOURCE_DIR}/include")
     target_link_libraries(radar_app PRIVATE radar::modules radar::deps)
     target_compile_features(radar_app PRIVATE cxx_std_17)
     set_target_properties(radar_app PROPERTIES OUTPUT_NAME radar)
+  endif()
+
+  # MATLAB 导出工具
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/matlab_export_tool.cpp")
+    add_executable(matlab_export_tool "${CMAKE_CURRENT_SOURCE_DIR}/app/matlab_export_tool.cpp")
+    target_include_directories(matlab_export_tool PRIVATE "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(matlab_export_tool PRIVATE radar::modules radar::deps)
+    target_compile_features(matlab_export_tool PRIVATE cxx_std_17)
+    set_target_properties(matlab_export_tool PROPERTIES OUTPUT_NAME matlab_export_tool)
   endif()
 endif()
 

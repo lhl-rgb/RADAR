@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "core/radar_system_params.hpp"
-#include "target/target_config.hpp"
+#include "core/radar_system_params.h"
+#include "target/target_config.h"
 #include "target/target_kinematics.h"
 #include <string>
 

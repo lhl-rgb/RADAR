@@ -19,13 +19,13 @@
 #pragma once
 
 #include "core/types.h"
-#include "core/radar_system_params.hpp"
-#include "waveform/waveform_config.hpp"
+#include "core/radar_system_params.h"
+#include "waveform/waveform_config.h"
 
 #include <string>
 #include <vector>
 
-namespace radar {
+namespace radar::waveform {
 
 /**
  * @brief 波形生成器
@@ -47,7 +47,7 @@ public:
      * @brief 设置波形配置
      * @param cfg 波形配置参数
      */
-    void set_config(const waveform::WaveformConfig& cfg) { cfg_ = cfg; }
+    void set_config(const WaveformConfig& cfg) { cfg_ = cfg; }
 
     /**
      * @brief 设置系统参数
@@ -123,7 +123,7 @@ public:
     /**
      * @brief 获取当前波形配置
      */
-    const waveform::WaveformConfig& config() const { return cfg_; }
+    const WaveformConfig& config() const { return cfg_; }
 
     /**
      * @brief 获取当前系统参数
@@ -154,10 +154,10 @@ private:
     /**
      * @brief 生成窗函数权重
      */
-    std::vector<Scalar> generate_window_weights(int length, WindowType type) const;
+    ScalarVector generate_window_weights(int length, WindowType type) const;
 
     RadarSystemParams sys_;
-    waveform::WaveformConfig cfg_;
+    WaveformConfig cfg_;
     ComplexVec waveform_;
     ComplexVec matched_filter_;
     ComplexVec spectrum_;

@@ -13,6 +13,7 @@
 #include "core/types.h"
 
 #include <string>
+#include <nlohmann/json.hpp>
 
 namespace radar::waveform {
 
@@ -34,31 +35,21 @@ struct WaveformConfig {
     bool validate(std::string& error) const;
 };
 
-inline bool WaveformConfig::validate(std::string& error) const {
-    // 波形类型检查
-    if (waveform_type != WaveformType::LFM &&
-        waveform_type != WaveformType::NLFM &&
-        waveform_type != WaveformType::PHASE_CODED &&
-        waveform_type != WaveformType::CW) {
-        error = "Invalid waveform type";
-        return false;
-    }
+// JSON 序列化支持
+inline void from_json(const nlohmann::json& j, WaveformConfig& cfg) {
+    if (j.contains("waveform_type")) j.at("waveform_type").get_to(cfg.waveform_type);
+    if (j.contains("phase_code_type")) j.at("phase_code_type").get_to(cfg.phase_code_type);
+    if (j.contains("nlfm_window_type")) j.at("nlfm_window_type").get_to(cfg.nlfm_window_type);
+    if (j.contains("polarization")) j.at("polarization").get_to(cfg.polarization);
+}
 
-    // 相位编码类型检查
-    if (waveform_type == WaveformType::PHASE_CODED) {
-        if (phase_code_type != PhaseCodeType::Barker2 &&
-            phase_code_type != PhaseCodeType::Barker3 &&
-            phase_code_type != PhaseCodeType::Barker4 &&
-            phase_code_type != PhaseCodeType::Barker5 &&
-            phase_code_type != PhaseCodeType::Barker7 &&
-            phase_code_type != PhaseCodeType::Barker11 &&
-            phase_code_type != PhaseCodeType::Barker13) {
-            error = "Invalid phase code type";
-            return false;
-        }
-    }
-
-    return true;
+inline void to_json(nlohmann::json& j, const WaveformConfig& cfg) {
+    j = nlohmann::json{
+        {"waveform_type", cfg.waveform_type},
+        {"phase_code_type", cfg.phase_code_type},
+        {"nlfm_window_type", cfg.nlfm_window_type},
+        {"polarization", cfg.polarization}
+    };
 }
 
 } // namespace radar::waveform

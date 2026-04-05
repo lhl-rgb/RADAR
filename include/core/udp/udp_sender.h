@@ -7,7 +7,7 @@
 
 #include "core/udp/udp_config.h"
 #include "core/types.h"
-#include "core/radar_system_params.hpp"
+#include "core/radar_system_params.h"
 
 #include <cstdint>
 #include <string>

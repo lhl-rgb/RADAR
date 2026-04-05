@@ -98,10 +98,10 @@ inline Scalar clamp_nonnegative(Scalar value) {
 }
 
 /**
- * @brief 把值截断到正下限 EPSILON（数值稳定下限）
+ * @brief 把值截断到正下限（数值稳定下限）
  */
 inline Scalar clamp_positive_eps(Scalar value, Scalar eps = EPSILON) {
-    return std::max(value, std::max(eps, EPSILON));
+    return std::max(value, eps);
 }
 
 /**

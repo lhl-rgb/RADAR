@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "antenna/antenna_config.hpp"
+#include "antenna/antenna_config.h"
 #include "core/types.h"
 
 #include <string>
@@ -146,12 +146,12 @@ private:
     /**
      * @brief 生成加权向量
      */
-    static std::vector<Scalar> make_weights(int length, AntennaWeightType weight_type);
+    static ScalarVector make_weights(int length, AntennaWeightType weight_type);
 
     AntennaConfig config_;
     Scalar peak_gain_linear_ = 1.0;
-    std::vector<Scalar> weights_az_;
-    std::vector<Scalar> weights_el_;
+    ScalarVector weights_az_;
+    ScalarVector weights_el_;
     bool initialized_ = false;
 };
 
