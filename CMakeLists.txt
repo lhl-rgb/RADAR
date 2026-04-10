@@ -183,6 +183,42 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app")
     target_compile_features(matlab_export_tool PRIVATE cxx_std_17)
     set_target_properties(matlab_export_tool PROPERTIES OUTPUT_NAME matlab_export_tool)
   endif()
+
+  # 波形验证工具
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/waveform_validation.cpp")
+    add_executable(waveform_validation "${CMAKE_CURRENT_SOURCE_DIR}/app/waveform_validation.cpp")
+    target_include_directories(waveform_validation PRIVATE "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(waveform_validation PRIVATE radar::modules radar::deps)
+    target_compile_features(waveform_validation PRIVATE cxx_std_17)
+    set_target_properties(waveform_validation PROPERTIES OUTPUT_NAME waveform_validation)
+  endif()
+
+  # 天线验证工具
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/antenna_validation.cpp")
+    add_executable(antenna_validation "${CMAKE_CURRENT_SOURCE_DIR}/app/antenna_validation.cpp")
+    target_include_directories(antenna_validation PRIVATE "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(antenna_validation PRIVATE radar::modules radar::deps)
+    target_compile_features(antenna_validation PRIVATE cxx_std_17)
+    set_target_properties(antenna_validation PROPERTIES OUTPUT_NAME antenna_validation)
+  endif()
+
+  # 噪声验证工具
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/noise_validation.cpp")
+    add_executable(noise_validation "${CMAKE_CURRENT_SOURCE_DIR}/app/noise_validation.cpp")
+    target_include_directories(noise_validation PRIVATE "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(noise_validation PRIVATE radar::modules radar::deps)
+    target_compile_features(noise_validation PRIVATE cxx_std_17)
+    set_target_properties(noise_validation PROPERTIES OUTPUT_NAME noise_validation)
+  endif()
+
+  # 杂波验证工具
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/clutter_validation.cpp")
+    add_executable(clutter_validation "${CMAKE_CURRENT_SOURCE_DIR}/app/clutter_validation.cpp")
+    target_include_directories(clutter_validation PRIVATE "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(clutter_validation PRIVATE radar::modules radar::deps)
+    target_compile_features(clutter_validation PRIVATE cxx_std_17)
+    set_target_properties(clutter_validation PROPERTIES OUTPUT_NAME clutter_validation)
+  endif()
 endif()
 
 # 测试

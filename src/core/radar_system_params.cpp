@@ -49,7 +49,8 @@ void RadarSystemParams::compute_derived_params() {
     const Scalar range_span_m = math::clamp_nonnegative(max_range_m - min_range_m);
     const Scalar fast_time_window_s = (2.0 * range_span_m / C) + safe_pulse_width;
     samples_per_pulse = std::max(1, static_cast<int>(std::ceil(fast_time_window_s * safe_fs)));
-    samples_per_tx = std::max(1, static_cast<int>(std::ceil(safe_pulse_width * safe_fs)));
+    // 使用 round 与 MATLAB 保持一致，避免浮点精度问题导致 ceil 结果偏大
+    samples_per_tx = std::max(1, static_cast<int>(std::round(safe_pulse_width * safe_fs)));
     
     // Linear values
     noise_figure_linear = math::db_to_linear(noise_figure_db);

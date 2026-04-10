@@ -12,7 +12,12 @@
       "Bash(chmod +x /home/lhlj/Radar/build.sh)",
       "Bash(/home/lhlj/Radar/build.sh)",
       "Bash(/home/lhlj/Radar/out/bin/radar)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(./out/bin/noise_validation)",
+      "Bash(cd /home/lhlj/Radar/matlab/03 噪声仿真)",
+      "Bash(matlab -batch \"run\\('compare_noise_cpp_matlab.m'\\); exit\")",
+      "Bash(python3 -c ':*)",
+      "Bash(xxd \"matlab/05 杂波仿真/sea_clutter_sim/validate_clutter_generator.m\")"
     ]
   }
 }

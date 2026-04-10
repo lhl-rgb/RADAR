@@ -323,8 +323,8 @@ void test_noise_engine() {
 
         // 验证噪声功率计算
         Scalar k = 1.380649e-23;
-        Scalar expected_power = k * cfg.system_temperature_k * cfg.noise_bandwidth_hz *
-                                std::pow(10.0, sys.noise_figure_db / 10.0);
+        Scalar F = std::pow(10.0, sys.noise_figure_db / 10.0);
+        Scalar expected_power = k * cfg.system_temperature_k * cfg.noise_bandwidth_hz * F;
 
         assert_near(engine.noise_power_w(), expected_power, expected_power * 0.01,
                     "ThermalKTB power calculation");
@@ -387,6 +387,113 @@ void test_noise_engine() {
             }
         }
         assert_true(identical, "Same seed produces identical noise");
+    }
+
+    // --- I/Q 分量独立性验证 ---
+    {
+        radar::noise::NoiseEngine engine;
+        radar::noise::NoiseConfig cfg;
+        cfg.mode = radar::NoiseLevelMode::ComplexSigma;
+        cfg.sigma_complex = 1e-3;
+        cfg.seed = 12345;
+
+        engine.set_config(cfg);
+        engine.set_system_params(sys);
+        engine.initialize();
+
+        const std::size_t N = 100000;
+        auto noise = engine.generate(N);
+
+        // 计算 I/Q 分量的互相关
+        Scalar iq_correlation = 0.0;
+        Scalar i_mean = 0.0, q_mean = 0.0;
+
+        for (const auto& n : noise) {
+            i_mean += n.real();
+            q_mean += n.imag();
+        }
+        i_mean /= N;
+        q_mean /= N;
+
+        for (const auto& n : noise) {
+            iq_correlation += (n.real() - i_mean) * (n.imag() - q_mean);
+        }
+        iq_correlation /= N;
+
+        // I/Q 应该独立，互相关应该接近 0
+        Scalar theoretical_iq_var = (cfg.sigma_complex * cfg.sigma_complex) / 2.0;
+        Scalar normalized_correlation = iq_correlation / theoretical_iq_var;
+
+        assert_true(std::abs(normalized_correlation) < 0.01,
+                    "I/Q components uncorrelated",
+                    "correlation=" + std::to_string(normalized_correlation));
+    }
+
+    // --- SNR 验证 ---
+    {
+        radar::noise::NoiseEngine engine;
+        radar::noise::NoiseConfig cfg;
+        cfg.mode = radar::NoiseLevelMode::NoisePower;
+        cfg.noise_power_w = 1e-6;
+        cfg.seed = 12345;
+
+        engine.set_config(cfg);
+        engine.set_system_params(sys);
+        engine.initialize();
+
+        // 创建信号：SNR = 20 dB (信号功率是噪声的 100 倍)
+        const std::size_t N = 100000;
+        Scalar signal_power = 100.0 * cfg.noise_power_w;
+        ComplexVec signal(N, Complex(std::sqrt(signal_power), 0.0));
+        ComplexVec noise = engine.generate(N);
+
+        // 计算实测 SNR
+        Scalar noise_power = 0.0;
+        for (const auto& n : noise) {
+            noise_power += std::norm(n);
+        }
+        noise_power /= N;
+
+        Scalar measured_snr_db = math::linear_to_db(signal_power / noise_power);
+        Scalar theoretical_snr_db = 20.0;  // 10 * log10(100)
+        Scalar snr_error = std::abs(measured_snr_db - theoretical_snr_db);
+
+        assert_true(snr_error < 0.1, "SNR verification at 20dB",
+                    "measured=" + std::to_string(measured_snr_db) +
+                    ", expected=" + std::to_string(theoretical_snr_db) +
+                    ", error=" + std::to_string(snr_error));
+    }
+
+    // --- ThermalKTB 模式统计验证 ---
+    {
+        radar::noise::NoiseEngine engine;
+        radar::noise::NoiseConfig cfg;
+        cfg.mode = radar::NoiseLevelMode::ThermalKTB;
+        cfg.system_temperature_k = 290.0;
+        cfg.noise_bandwidth_hz = 20e6;
+        cfg.seed = 12345;
+
+        engine.set_config(cfg);
+        engine.set_system_params(sys);
+        engine.initialize();
+
+        // 生成样本验证统计特性
+        const std::size_t N = 100000;
+        auto noise = engine.generate(N);
+
+        Scalar total_power = 0.0;
+        for (const auto& n : noise) {
+            total_power += std::norm(n);
+        }
+        Scalar avg_power = total_power / N;
+        Scalar expected_power = engine.noise_power_w();
+
+        Scalar rel_error = std::abs(avg_power - expected_power) / expected_power;
+
+        assert_true(rel_error < 0.005, "ThermalKTB statistical verification",
+                    "expected=" + std::to_string(expected_power) +
+                    ", actual=" + std::to_string(avg_power) +
+                    ", rel_error=" + std::to_string(rel_error));
     }
 }
 
@@ -556,6 +663,7 @@ void test_data_exporter() {
 void test_matlab_export() {
     std::cout << "\n=== MATLAB Export Tests ===" << std::endl;
 
+
     std::string matlab_output_dir = "out/matlab_test";
     std::filesystem::create_directories(matlab_output_dir);
 
@@ -706,6 +814,189 @@ void test_matlab_export() {
 }
 
 // ============================================================================
+// Antenna 测试
+// ============================================================================
+void test_antenna() {
+    std::cout << "\n=== Antenna Tests ===" << std::endl;
+
+    // --- ULA 单波位增益测试 ---
+    {
+        antenna::AntennaConfig cfg;
+        cfg.model_type = PhasedArrayModelType::ULA_1D;
+        cfg.num_elements_az = 16;
+        cfg.num_elements_el = 1;
+        cfg.spacing_az_lambda = 0.5;
+        cfg.peak_gain_db = 30.0;
+        cfg.weight_type_az = AntennaWeightType::Uniform;
+
+        antenna::AntennaModel model;
+        model.set_config(cfg);
+        model.initialize();
+
+        // 波束指向 0°，目标 10°，有一定角度偏差，增益会降低
+        Scalar gain_db = model.gain_db(10.0, 0.0, 0.0, 0.0);
+        Scalar norm_pwr = model.normalized_power(10.0, 0.0, 0.0, 0.0);
+
+        // 验证增益在合理范围内 (10°偏离应该在主瓣内，但增益会降低)
+        assert_true(gain_db > 15.0 && gain_db <= 30.0, "ULA gain in range",
+                    "gain=" + std::to_string(gain_db) + " dB");
+
+        // 验证归一化功率在 0-1 之间
+        assert_true(norm_pwr > 0.0 && norm_pwr <= 1.0, "ULA normalized power valid",
+                    "power=" + std::to_string(norm_pwr));
+    }
+
+    // --- ULA 均匀加权 vs Hamming 加权 ---
+    {
+        antenna::AntennaConfig cfg_uniform;
+        cfg_uniform.model_type = PhasedArrayModelType::ULA_1D;
+        cfg_uniform.num_elements_az = 16;
+        cfg_uniform.weight_type_az = AntennaWeightType::Uniform;
+        cfg_uniform.peak_gain_db = 30.0;
+
+        antenna::AntennaConfig cfg_hamming;
+        cfg_hamming.model_type = PhasedArrayModelType::ULA_1D;
+        cfg_hamming.num_elements_az = 16;
+        cfg_hamming.weight_type_az = AntennaWeightType::Hamming;
+        cfg_hamming.peak_gain_db = 30.0;
+
+        antenna::AntennaModel model_uniform, model_hamming;
+        model_uniform.set_config(cfg_uniform);
+        model_uniform.initialize();
+        model_hamming.set_config(cfg_hamming);
+        model_hamming.initialize();
+
+        // 主瓣中心增益
+        Scalar gain_uniform = model_uniform.gain_db(0.0, 0.0, 0.0, 0.0);
+        Scalar gain_hamming = model_hamming.gain_db(0.0, 0.0, 0.0, 0.0);
+
+        // Hamming 加权由于归一化，峰值应该与均匀加权相同 (都是 0dB 归一化)
+        assert_near(gain_uniform, 30.0, 0.01, "ULA uniform peak gain");
+        assert_near(gain_hamming, 30.0, 0.01, "ULA hamming peak gain");
+    }
+
+    // --- UPA 单波位增益测试 ---
+    {
+        antenna::AntennaConfig cfg;
+        cfg.model_type = PhasedArrayModelType::UPA_2D;
+        cfg.num_elements_az = 16;
+        cfg.num_elements_el = 12;
+        cfg.spacing_az_lambda = 0.5;
+        cfg.spacing_el_lambda = 0.5;
+        cfg.peak_gain_db = 35.0;
+        cfg.weight_type_az = AntennaWeightType::Hamming;
+        cfg.weight_type_el = AntennaWeightType::Hamming;
+
+        antenna::AntennaModel model;
+        model.set_config(cfg);
+        model.initialize();
+
+        // 主瓣中心
+        Scalar gain_db = model.gain_db(0.0, 0.0, 0.0, 0.0);
+        Scalar norm_pwr = model.normalized_power(0.0, 0.0, 0.0, 0.0);
+
+        assert_near(gain_db, 35.0, 0.01, "UPA peak gain at boresight");
+        assert_near(norm_pwr, 1.0, 1e-6, "UPA normalized power at boresight");
+
+        // 离轴增益应该降低
+        Scalar off_axis_gain = model.gain_db(15.0, 8.0, 0.0, 0.0);
+        assert_true(off_axis_gain < gain_db, "UPA off-axis gain lower",
+                    "on_axis=" + std::to_string(gain_db) +
+                    ", off_axis=" + std::to_string(off_axis_gain));
+    }
+
+    // --- UPA 方向余弦计算验证 ---
+    {
+        antenna::AntennaConfig cfg;
+        cfg.model_type = PhasedArrayModelType::UPA_2D;
+        cfg.num_elements_az = 8;
+        cfg.num_elements_el = 8;
+        cfg.spacing_az_lambda = 0.5;
+        cfg.spacing_el_lambda = 0.5;
+        cfg.peak_gain_db = 25.0;
+
+        antenna::AntennaModel model;
+        model.set_config(cfg);
+        model.initialize();
+
+        // 波束指向 (15, 8) 度，目标也在 (15, 8) 度，应该获得最大增益
+        Scalar gain = model.gain_db(15.0, 8.0, 15.0, 8.0);
+        Scalar norm_pwr = model.normalized_power(15.0, 8.0, 15.0, 8.0);
+
+        assert_near(norm_pwr, 1.0, 1e-6, "UPA power at scan direction");
+        assert_near(gain, 25.0, 0.01, "UPA gain at scan direction");
+    }
+
+    // --- BeamScanner 基本功能测试 ---
+    {
+        antenna::AntennaConfig ant_cfg;
+        ant_cfg.model_type = PhasedArrayModelType::ULA_1D;
+        ant_cfg.num_elements_az = 8;
+        ant_cfg.peak_gain_db = 25.0;
+
+        antenna::BeamTableConfig beam_cfg;
+        beam_cfg.type = "azimuth_scan";
+        beam_cfg.az_start_deg = -10.0;
+        beam_cfg.az_end_deg = 10.0;
+        beam_cfg.az_step_deg = 5.0;
+        beam_cfg.elevation_deg = 0.0;
+
+        antenna::BeamScanner scanner;
+        scanner.set_antenna_config(ant_cfg);
+        scanner.set_beam_table_config(beam_cfg);
+        bool init = scanner.initialize();
+
+        assert_true(init, "BeamScanner initialize");
+        assert_true(scanner.beam_count() == 5, "BeamScanner beam count",
+                    "count=" + std::to_string(scanner.beam_count()));
+
+        // 测试扫描
+        scanner.reset();
+        BeamPoint first = scanner.get_beam_pointing();
+        assert_near(first.azimuth_deg, -10.0, 0.01, "First beam azimuth");
+
+        scanner.advance_one_cpi();
+        BeamPoint second = scanner.get_beam_pointing();
+        assert_near(second.azimuth_deg, -5.0, 0.01, "Second beam azimuth");
+
+        // 测试增益计算
+        scanner.reset();
+        Scalar gain = scanner.get_gain_db_to_target(-10.0, 0.0);
+        assert_true(gain > 20.0 && gain <= 25.0, "BeamScanner gain in range",
+                    "gain=" + std::to_string(gain));
+    }
+
+    // --- BeamScanner 循环扫描测试 ---
+    {
+        antenna::AntennaConfig ant_cfg;
+        ant_cfg.model_type = PhasedArrayModelType::ULA_1D;
+        ant_cfg.num_elements_az = 4;
+        ant_cfg.peak_gain_db = 20.0;
+
+        antenna::BeamTableConfig beam_cfg;
+        beam_cfg.type = "azimuth_scan";
+        beam_cfg.az_start_deg = 0.0;
+        beam_cfg.az_end_deg = 3.0;
+        beam_cfg.az_step_deg = 1.0;
+
+        antenna::BeamScanner scanner;
+        scanner.set_antenna_config(ant_cfg);
+        scanner.set_beam_table_config(beam_cfg);
+        scanner.initialize();
+
+        // 循环扫描一圈回到起点
+        BeamPoint start = scanner.get_beam_pointing();
+        for (std::size_t i = 0; i < scanner.beam_count(); ++i) {
+            scanner.advance_one_cpi();
+        }
+        BeamPoint after_loop = scanner.get_beam_pointing();
+
+        assert_near(after_loop.azimuth_deg, start.azimuth_deg, 0.01,
+                    "BeamScanner wraps around");
+    }
+}
+
+// ============================================================================
 // 主测试函数
 // ============================================================================
 int main() {
@@ -732,6 +1023,7 @@ int main() {
     test_sea_clutter();
     test_data_exporter();
     test_matlab_export();
+    test_antenna();
 
     // 打印汇总
     std::cout << "\n╔══════════════════════════════════════════╗" << std::endl;

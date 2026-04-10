@@ -19,9 +19,9 @@ struct RadarSystemParams {
     // ===== 基础物理参数 =====
     Scalar fc_hz = 10.0e9;              ///< 载频 (Hz)
     Scalar prf_hz = 1600.0;             ///< 脉冲重复频率 (Hz)
-    Scalar fs_hz = 40.0e6;              ///< ADC采样率 (Hz)
-    Scalar bw_hz = 20.0e6;              ///< 信号带宽 (Hz)
-    Scalar pulse_width_s = 20.0e-6;     ///< 脉冲宽度 (s)
+    Scalar fs_hz = 20.0e6;              ///< ADC采样率 (Hz)
+    Scalar bw_hz = 10.0e6;              ///< 信号带宽 (Hz)
+    Scalar pulse_width_s = 40.0e-6;     ///< 脉冲宽度 (s)
     Scalar peak_power_w = 5000.0;       ///< 峰值发射功率 (W)
     int pulses_per_cpi = 32;            ///< 每 CPI 脉冲数
 
