@@ -15,9 +15,9 @@
 #include "noise/noise_config.h"
 #include "target/target_config.h"
 #include "waveform/waveform_config.h"
-#include "core/data_exporter.h"
-#include "core/udp/udp_config.h"
-#include "core/udp/udp_sender.h"
+#include "core/tools/data_exporter.h"
+#include "core/tools/udp_config.h"
+#include "core/tools/udp_sender.h"
 
 #include <string>
 #include <vector>

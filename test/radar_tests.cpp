@@ -17,7 +17,7 @@
 #include <algorithm>
 
 #include "core/types.h"
-#include "core/math_utils.h"
+#include "core/tools/math_utils.h"
 #include "core/radar_system_params.h"
 #include "waveform/waveform_generator.h"
 #include "waveform/waveform_config.h"
@@ -27,7 +27,7 @@
 #include "clutter/sea_clutter_config.h"
 #include "antenna/antenna_model.h"
 #include "antenna/beam_scanner.h"
-#include "core/data_exporter.h"
+#include "core/tools/data_exporter.h"
 #include "target/target_config.h"
 
 using namespace radar;

@@ -4,7 +4,7 @@
  */
 
 #include "target/target_echo_synthesizer.h"
-#include "core/math_utils.h"
+#include "core/tools/math_utils.h"
 
 #include <cmath>
 

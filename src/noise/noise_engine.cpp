@@ -4,7 +4,7 @@
  */
 
 #include "noise/noise_engine.h"
-#include "core/math_utils.h"
+#include "core/tools/math_utils.h"
 
 #include <cmath>
 #include <limits>

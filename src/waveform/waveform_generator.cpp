@@ -4,7 +4,7 @@
  */
 
 #include "waveform/waveform_generator.h"
-#include "core/math_utils.h"
+#include "core/tools/math_utils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -101,7 +101,7 @@ Scalar invert_monotonic_linear(
 //  这样 N 个采样点覆盖 [0.5*dt, (N-0.5)*dt] ≈ [0, T]
 // ============================================================
 inline Scalar sample_time(int n, Scalar dt) {
-    return (static_cast<Scalar>(n) + 0.5) * dt;
+    return (static_cast<Scalar>(n) ) * dt;
 }
 
 }  // anonymous namespace

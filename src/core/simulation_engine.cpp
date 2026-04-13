@@ -121,6 +121,28 @@ bool SimulationEngine::initialize_engines() {
         }
     }
 
+    if(data_exporter_ && config_.data_export.enabled) {
+        // 导出配置参数
+        if (!data_exporter_->export_config_params(config_.system, config_.target, initial_targets_)) {
+            SPDLOG_ERROR("[DataExporter] Failed to export config params: {}", data_exporter_->last_error());
+        } else {
+            SPDLOG_INFO("[DataExporter] Config params exported.");
+        }
+        //导出波形
+        const std::string& export_dir = config_.data_export.output_dir;
+        if(!data_exporter_->export_complex_csv(export_dir + "/tx_waveform.csv", waveform_gen_->get_waveform(), "tx_waveform")) {
+            SPDLOG_ERROR("[DataExporter] Failed to export tx waveform: {}", data_exporter_->last_error());
+        } else {
+            SPDLOG_INFO("[DataExporter] Tx waveform exported.");
+        }
+        // 导出匹配滤波器
+        if(!data_exporter_->export_complex_csv(export_dir + "/matched_filter.csv", waveform_gen_->get_matched_filter(), "matched_filter")) {
+            SPDLOG_ERROR("[DataExporter] Failed to export matched filter: {}", data_exporter_->last_error());
+        } else {
+            SPDLOG_INFO("[DataExporter] Matched filter exported.");
+        }
+    }
+
     // 9. 初始化 UDP 发送器（可选模块）
     if (config_.udp_output.enabled) {
         udp_sender_ = std::make_unique<core::UdpSender>(config_.udp_output);
@@ -256,16 +278,20 @@ void SimulationEngine::process_single_cpi(int cpi_index,
             total_echo.pulses[p][n] += target_echo.pulses[p][n];
         }
     }
-
-    // 加上杂波回波
-    for (std::size_t p = 0; p < clutter_echo.pulses.size() && p < total_echo.pulses.size(); ++p) {
-        for (std::size_t n = 0; n < clutter_echo.pulses[p].size() && n < total_echo.pulses[p].size(); ++n) {
-            total_echo.pulses[p][n] += clutter_echo.pulses[p][n];
+    if(config_.clutter.enabled) {
+        // 加上杂波回波
+        for (std::size_t p = 0; p < clutter_echo.pulses.size() && p < total_echo.pulses.size(); ++p) {
+            for (std::size_t n = 0; n < clutter_echo.pulses[p].size() && n < total_echo.pulses[p].size(); ++n) {
+                total_echo.pulses[p][n] += clutter_echo.pulses[p][n];
+            }
         }
     }
+    
+    if(config_.noise.enabled){
+        // 添加噪声
+        noise_engine_->add_noise(total_echo);
+    }
 
-    // 添加噪声
-    noise_engine_->add_noise(total_echo);
 
     // 计算回波功率统计
     Scalar total_power = 0.0;
@@ -335,10 +361,8 @@ void SimulationEngine::run_scan_loop() {
             }
         }
 
-        // 扫描完成，处理数据
-        if (!stop_requested_) {
-            process_scan_complete(scan, scan_cpi_echos, scan_target_snapshots);
-        }
+        // 扫描完成，处理数据（每圈扫描结束后导出）
+        process_scan_complete(scan, scan_cpi_echos, scan_target_snapshots);
     }
 
     SPDLOG_INFO("=== Simulation Complete ===");

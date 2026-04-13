@@ -6,8 +6,8 @@
 #include <nlohmann/json.hpp>
 
 #include "types.h"
-#include "math_utils.h"
-#include "core/udp/udp_config.h"
+#include "core/tools/math_utils.h"
+#include "core/tools/udp_config.h"
 
 namespace radar {
 

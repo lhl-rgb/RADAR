@@ -20,7 +20,7 @@
 #include <getopt.h>
 
 #include "core/types.h"
-#include "core/math_utils.h"
+#include "core/tools/math_utils.h"
 #include "core/radar_system_params.h"
 #include "waveform/waveform_generator.h"
 #include "waveform/waveform_config.h"

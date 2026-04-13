@@ -33,7 +33,7 @@
 #include <getopt.h>
 
 #include "core/types.h"
-#include "core/math_utils.h"
+#include "core/tools/math_utils.h"
 #include "antenna/antenna_model.h"
 #include "antenna/beam_scanner.h"
 #include "antenna/antenna_config.h"

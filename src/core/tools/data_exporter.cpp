@@ -3,7 +3,7 @@
  * @brief 仿真数据导出器实现
  */
 
-#include "core/data_exporter.h"
+#include "core/tools/data_exporter.h"
 #include <filesystem>
 #include <sstream>
 #include <cmath>
@@ -46,8 +46,8 @@ bool DataExporter::export_scan(const ScanData& scan_data) {
 
     bool success = true;
 
-    // 导出配置参数（只在第一圈导出）
-    if (config_.export_config_params && scan_data.scan_index == 0) {
+    // 导出配置参数（每圈都覆盖写，保证参数文件与本次运行一致）
+    if (config_.export_config_params) {
         success &= export_config_params(scan_data.system_params,
                                         scan_data.target_config,
                                         scan_data.initial_targets);
@@ -56,14 +56,6 @@ bool DataExporter::export_scan(const ScanData& scan_data) {
     // 导出 IQ 数据（二进制 dat 格式）
     if (config_.export_raw_echo_iq) {
         success &= export_echo_iq_dat(scan_data.cpi_echos, scan_data.scan_index);
-    }
-
-    // 导出目标轨迹
-    if (config_.export_target_snapshots && !scan_data.target_snapshots_per_cpi.empty()) {
-        int pulses_per_cpi = scan_data.system_params.pulses_per_cpi;
-        Scalar pri_s = scan_data.system_params.pri_s;
-        success &= export_target_trajectory(scan_data.target_snapshots_per_cpi,
-                                            pulses_per_cpi, pri_s);
     }
 
     return success;
@@ -129,64 +121,6 @@ bool DataExporter::export_config_params(const RadarSystemParams& system,
         last_error_ = std::string("Failed to write JSON: ") + e.what();
         return false;
     }
-}
-
-bool DataExporter::export_target_trajectory(const std::vector<TargetList>& all_snapshots,
-                                             int pulses_per_cpi,
-                                             Scalar pri_s) {
-    std::string filepath = config_.output_dir + "/target_trajectory.csv";
-
-    std::vector<std::string> headers = {
-        "cpi_index", "pulse_index", "slow_time_s",
-        "target_id", "range_m", "radial_velocity_mps", "radial_acceleration_mps2",
-        "azimuth_deg", "elevation_deg", "rcs_m2"
-    };
-
-    std::vector<std::vector<std::string>> rows;
-    Scalar total_time = 0.0;
-
-    for (std::size_t cpi_idx = 0; cpi_idx < all_snapshots.size(); ++cpi_idx) {
-        const auto& targets = all_snapshots[cpi_idx];
-        for (int pulse_idx = 0; pulse_idx < pulses_per_cpi; ++pulse_idx) {
-            Scalar slow_time = total_time + pulse_idx * pri_s;
-
-            for (const auto& target : targets) {
-                if (!target.enabled) continue;
-
-                // 计算径向速度和距离
-                Vec3 pos = target.position_m;
-                Vec3 vel = target.velocity_mps;
-
-                Scalar range = pos.norm();
-                Vec3 los = pos / range;  // 单位视线向量
-                Scalar radial_vel = los.dot(vel);
-
-                // 简化计算径向加速度
-                Scalar radial_acc = 0.0;
-
-                // 计算方位角和俯仰角
-                Scalar az = std::atan2(pos.y(), pos.x()) * 180.0 / PI;
-                Scalar el = std::asin(pos.z() / range) * 180.0 / PI;
-
-                std::vector<std::string> row;
-                row.push_back(std::to_string(cpi_idx));
-                row.push_back(std::to_string(pulse_idx));
-                row.push_back(std::to_string(slow_time));
-                row.push_back(std::to_string(target.id));
-                row.push_back(std::to_string(range));
-                row.push_back(std::to_string(radial_vel));
-                row.push_back(std::to_string(radial_acc));
-                row.push_back(std::to_string(az));
-                row.push_back(std::to_string(el));
-                row.push_back(std::to_string(target.rcs_mean_m2));
-
-                rows.push_back(row);
-            }
-        }
-        total_time += pulses_per_cpi * pri_s;
-    }
-
-    return write_csv_file(filepath, headers, rows);
 }
 
 bool DataExporter::export_echo_iq_dat(const std::vector<CpiEcho>& cpi_echos,
@@ -271,4 +205,45 @@ bool DataExporter::write_csv_file(const std::string& filepath,
     }
 }
 
+
+
+// 导出复数数据为CSV
+bool DataExporter::export_complex_csv(const std::string& filepath,
+                        const ComplexVec& data,
+                        const std::string& var_name) {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        last_error_ = "Failed to open file: " + filepath;
+        return false;
+    }
+
+    file << std::scientific << std::setprecision(15);
+    file << "index,real,imag\n";
+
+    for (std::size_t i = 0; i < data.size(); ++i) {
+        file << i << "," << data[i].real() << "," << data[i].imag() << "\n";
+    }
+
+    return true;
+}
+
+// 导出实数数据为CSV
+bool DataExporter::export_scalar_csv(const std::string& filepath,
+                       const std::vector<Scalar>& data,
+                       const std::string& var_name) {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        last_error_ = "Failed to open file: " + filepath;
+        return false;
+    }
+
+    file << std::scientific << std::setprecision(15);
+    file << "index,value\n";
+
+    for (std::size_t i = 0; i < data.size(); ++i) {
+        file << i << "," << data[i] << "\n";
+    }
+
+    return true;
+}
 }  // namespace radar::core

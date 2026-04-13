@@ -10,7 +10,7 @@
 #pragma once
 
 #include "core/types.h"
-#include "core/math_utils.h"
+#include "core/tools/math_utils.h"
 #include <cstdint>
 #include <string>
 #include <nlohmann/json.hpp>

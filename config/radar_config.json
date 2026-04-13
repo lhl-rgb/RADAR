@@ -2,21 +2,21 @@
   "system": {
     "fc_hz": 10000000000.0,
     "prf_hz": 1600.0,
-    "fs_hz": 40000000.0,
-    "bw_hz": 20000000.0,
-    "pulse_width_s": 0.00002,
+    "fs_hz": 60000000.0,
+    "bw_hz": 25000000.0,
+    "pulse_width_s": 0.000002,
     "peak_power_w": 5000.0,
     "pulses_per_cpi": 32,
     "min_range_m": 1000.0,
-    "max_range_m": 120000.0,
+    "max_range_m": 10000.0,
     "antenna_height_m": 15.0,
     "radar_location": {
       "latitude": 0.0,
       "longitude": 0.0,
       "altitude": 15.0
     },
-    "noise_figure_db": 4.0,
-    "system_loss_db": 6.0,
+    "noise_figure_db": 0,
+    "system_loss_db": 0,
     "udp_output": {
       "enabled": false,
       "target_ip": "127.0.0.1",
@@ -43,21 +43,21 @@
     "enabled": true,
     "mode": 0,
     "seed": 42,
-    "sigma_complex": 1.0,
+    "sigma_complex": 1.0e-6,
     "noise_power_w": 1.0e-6,
     "system_temperature_k": 290.0,
     "noise_bandwidth_hz": 20.0e6
   },
   "clutter": {
-    "enabled": true,
+    "enabled": false,
     "sequence_mode": 0,
     "grid_mode": 1,
     "seed": 2026,
     "ground_range_min_m": -1.0,
     "ground_range_max_m": -1.0,
     "range_step_m": 100.0,
-    "beam_az_width_deg": 3.0,
-    "az_step_deg": 0.1,
+    "beam_az_width_deg": 10.0,
+    "az_step_deg": 10.0,
     "k_shape_nu": 4.5,
     "doppler_center_hz": 0.0,
     "doppler_sigma_hz": 50.0,
@@ -77,52 +77,46 @@
     "enable_beam_gain": true,
     "enable_two_way_propagation_loss": true,
     "enable_phase": true,
-    "beam_gate_threshold_db": -20.0
+    "beam_gate_threshold_db": -35.0
   },
   "beam_table": {
     "type": "azimuth_scan",
-    "az_start_deg": -30,
-    "az_end_deg": 30,
-    "az_step_deg": 10,
+    "az_start_deg": 60,
+    "az_end_deg": 120,
+    "az_step_deg": 2,
     "elevation_deg": 0.0,
     "file_path": "",
     "beams": [
-      [-30, 0],
-      [-20, 0],
-      [-10, 0],
-      [0, 0],
-      [10, 0],
-      [20, 0],
-      [30, 0]
+
     ]
   },
   "initial_targets": [
     {
       "id": 1,
-      "position_m": [50000.0, 0.0, 5000.0],
+      "position_m": [7000,0 , 0.0],
       "velocity_mps": [0.0, 0.0, 0.0],
       "acceleration_mps2": [0.0, 0.0, 0.0],
       "motion_model": 0,
-      "rcs_mean_m2": 10.0,
+      "rcs_mean_m2": 30.0,
       "swerling": 1,
       "enabled": true
     },
     {
       "id": 2,
-      "position_m": [30000.0, 10000.0, 3000.0],
-      "velocity_mps": [100.0, 50.0, 0.0],
+      "position_m": [5000.0, 0, 0],
+      "velocity_mps": [0.0, 0.0, 0.0],
       "acceleration_mps2": [0.0, 0.0, 0.0],
-      "motion_model": 1,
+      "motion_model": 0,
       "rcs_mean_m2": 5.0,
       "swerling": 1,
       "enabled": true
     }
   ],
   "data_export": {
-    "enabled": false,
+    "enabled": true,
     "output_dir": "data",
     "export_raw_echo_iq": true,
-    "export_target_snapshots": true,
+    "export_target_snapshots": false,
     "export_config_params": true
   }
 }

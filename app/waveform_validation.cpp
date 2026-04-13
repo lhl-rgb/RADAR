@@ -26,7 +26,7 @@
 #include <getopt.h>
 
 #include "core/types.h"
-#include "core/math_utils.h"
+#include "core/tools/math_utils.h"
 #include "core/radar_system_params.h"
 #include "waveform/waveform_generator.h"
 #include "waveform/waveform_config.h"
@@ -36,7 +36,7 @@ using namespace radar;
 namespace fs = std::filesystem;
 
 struct ValidationOptions {
-    std::string output_dir = "out/validation";
+    std::string output_dir = "out/waveform_validation";
     bool export_all_waveforms = true;
     bool verbose = true;
 };
