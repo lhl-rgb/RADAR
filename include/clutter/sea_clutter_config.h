@@ -46,13 +46,13 @@ struct SeaClutterConfig {
     // 序列池参数
     int pool_length_factor = 32;        ///< 序列池长度倍数
 
-    // Morchin 模型参数
-    Scalar morchin_a0_db = -40.0;           ///< 基础项系数（dB）
-    Scalar morchin_a_g = 10.0;              ///< 掠射角项系数
-    Scalar morchin_a_f = 0.0;               ///< 载频项系数
-    Scalar morchin_a_s = 1.0;               ///< 海况项系数
-    Scalar morchin_sea_state = 3.0;         ///< 海况等级（经验输入）
-    Scalar morchin_sin_psi_floor = 1e-4;    ///< sin(psi) 下限，避免 log10(0)
+    // Morchin 模型参数（论文公式 2-24）
+    Scalar morchin_base_coeff = 4.0e-5;     ///< 基础系数 (公式中的 4×10⁻⁵)
+    Scalar morchin_theta_coeff = 0.65;      ///< 入射角系数 f(θ,ss) = 0.65 + 0.07×θ
+    Scalar morchin_theta_rate = 0.07;       ///< 入射角变化率 (每度)
+    Scalar morchin_sea_state = 3.0;         ///< 海况等级 (1-9)
+    Scalar morchin_beta_deg = 2.0;          ///< 粗糙度参数β (度)，与海态相关
+    Scalar morchin_grazing_angle_floor = 1e-4;  ///< 掠射角下限 (弧度)，避免数值问题
 
     /**
      * @brief 验证配置参数
@@ -84,22 +84,22 @@ inline void from_json(const nlohmann::json& j, SeaClutterConfig& cfg) {
     if (j.contains("pool_length_factor")) j.at("pool_length_factor").get_to(cfg.pool_length_factor);
 
     // Morchin 参数（扁平化）
-    if (j.contains("morchin_a0_db")) j.at("morchin_a0_db").get_to(cfg.morchin_a0_db);
-    if (j.contains("morchin_a_g")) j.at("morchin_a_g").get_to(cfg.morchin_a_g);
-    if (j.contains("morchin_a_f")) j.at("morchin_a_f").get_to(cfg.morchin_a_f);
-    if (j.contains("morchin_a_s")) j.at("morchin_a_s").get_to(cfg.morchin_a_s);
+    if (j.contains("morchin_base_coeff")) j.at("morchin_base_coeff").get_to(cfg.morchin_base_coeff);
+    if (j.contains("morchin_theta_coeff")) j.at("morchin_theta_coeff").get_to(cfg.morchin_theta_coeff);
+    if (j.contains("morchin_theta_rate")) j.at("morchin_theta_rate").get_to(cfg.morchin_theta_rate);
     if (j.contains("morchin_sea_state")) j.at("morchin_sea_state").get_to(cfg.morchin_sea_state);
-    if (j.contains("morchin_sin_psi_floor")) j.at("morchin_sin_psi_floor").get_to(cfg.morchin_sin_psi_floor);
+    if (j.contains("morchin_beta_deg")) j.at("morchin_beta_deg").get_to(cfg.morchin_beta_deg);
+    if (j.contains("morchin_grazing_angle_floor")) j.at("morchin_grazing_angle_floor").get_to(cfg.morchin_grazing_angle_floor);
 
     // 兼容旧格式：morchin 嵌套
     if (j.contains("morchin")) {
         const auto& mor = j.at("morchin");
-        if (mor.contains("a0_db")) mor.at("a0_db").get_to(cfg.morchin_a0_db);
-        if (mor.contains("a_g")) mor.at("a_g").get_to(cfg.morchin_a_g);
-        if (mor.contains("a_f")) mor.at("a_f").get_to(cfg.morchin_a_f);
-        if (mor.contains("a_s")) mor.at("a_s").get_to(cfg.morchin_a_s);
+        if (mor.contains("base_coeff")) mor.at("base_coeff").get_to(cfg.morchin_base_coeff);
+        if (mor.contains("theta_coeff")) mor.at("theta_coeff").get_to(cfg.morchin_theta_coeff);
+        if (mor.contains("theta_rate")) mor.at("theta_rate").get_to(cfg.morchin_theta_rate);
         if (mor.contains("sea_state")) mor.at("sea_state").get_to(cfg.morchin_sea_state);
-        if (mor.contains("sin_psi_floor")) mor.at("sin_psi_floor").get_to(cfg.morchin_sin_psi_floor);
+        if (mor.contains("beta_deg")) mor.at("beta_deg").get_to(cfg.morchin_beta_deg);
+        if (mor.contains("grazing_angle_floor")) mor.at("grazing_angle_floor").get_to(cfg.morchin_grazing_angle_floor);
     }
 }
 
@@ -116,12 +116,12 @@ inline void to_json(nlohmann::json& j, const SeaClutterConfig& cfg) {
         {"doppler_center_hz", cfg.doppler_center_hz},
         {"doppler_sigma_hz", cfg.doppler_sigma_hz},
         {"pool_length_factor", cfg.pool_length_factor},
-        {"morchin_a0_db", cfg.morchin_a0_db},
-        {"morchin_a_g", cfg.morchin_a_g},
-        {"morchin_a_f", cfg.morchin_a_f},
-        {"morchin_a_s", cfg.morchin_a_s},
+        {"morchin_base_coeff", cfg.morchin_base_coeff},
+        {"morchin_theta_coeff", cfg.morchin_theta_coeff},
+        {"morchin_theta_rate", cfg.morchin_theta_rate},
         {"morchin_sea_state", cfg.morchin_sea_state},
-        {"morchin_sin_psi_floor", cfg.morchin_sin_psi_floor}
+        {"morchin_beta_deg", cfg.morchin_beta_deg},
+        {"morchin_grazing_angle_floor", cfg.morchin_grazing_angle_floor}
     };
 }
 

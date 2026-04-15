@@ -509,10 +509,10 @@ bool SeaClutterModel::validate_params(const clutter::SeaClutterConfig& params, s
         return false;
     }
 
-    if (!std::isfinite(params.morchin_a0_db) || !std::isfinite(params.morchin_a_g) ||
-        !std::isfinite(params.morchin_a_f) || !std::isfinite(params.morchin_a_s) ||
-        !std::isfinite(params.morchin_sea_state) ||
-        !math::is_finite_positive(params.morchin_sin_psi_floor)) {
+    if (!std::isfinite(params.morchin_base_coeff) || !std::isfinite(params.morchin_theta_coeff) ||
+        !std::isfinite(params.morchin_theta_rate) || !std::isfinite(params.morchin_sea_state) ||
+        !std::isfinite(params.morchin_beta_deg) ||
+        !math::is_finite_positive(params.morchin_grazing_angle_floor)) {
         error = "Morchin params are invalid.";
         return false;
     }
@@ -572,14 +572,48 @@ bool SeaClutterModel::resolve_ground_range(const RadarSystemParams& system,
 }
 
 Scalar SeaClutterModel::morchin_sigma0_linear(Scalar grazing_rad, Scalar fc_hz) const {
-    const Scalar sin_psi = std::max(std::sin(math::clamp_nonnegative(grazing_rad)),
-                                    params_.morchin_sin_psi_floor);
-    const Scalar fc_ghz = math::clamp_positive_eps(fc_hz * 1.0e-9);
-    const Scalar sigma0_db = params_.morchin_a0_db +
-                             params_.morchin_a_g * std::log10(sin_psi) +
-                             params_.morchin_a_f * std::log10(fc_ghz) +
-                             params_.morchin_a_s * params_.morchin_sea_state;
-    return math::clamp_positive_eps(math::db_to_linear(sigma0_db));
+    // 根据论文公式 (2-24) 实现 Morchin 模型
+    // σ₀ = 4×10⁻⁵ × 10^(f(θ,ss)×ss) × (sinψ / cos²ψ) × exp(-tan²(β-φ) / tan²β)
+    // 其中：
+    //   - f(θ,ss) = 0.65 + 0.07×θ (θ为入射角，单位度)
+    //   - ψ = grazing_rad (掠射角，弧度)
+    //   - φ = arcsin(1/(4π×fs)) (粗糙度参数，这里简化处理)
+    //   - β = morchin_beta_deg (与海态相关的粗糙度参数)
+
+    const Scalar psi = math::clamp_positive_eps(grazing_rad);
+    const Scalar sin_psi = std::max(std::sin(psi), params_.morchin_grazing_angle_floor);
+
+    // 入射角θ (度) = 90° - 掠射角 (度)
+    const Scalar theta_deg = 90.0 - math::rad_to_deg(psi);
+
+    // f(θ,ss) = 0.65 + 0.07×θ
+    const Scalar f_theta = params_.morchin_theta_coeff + params_.morchin_theta_rate * theta_deg;
+
+    // 10^(f(θ,ss)×ss)
+    const Scalar sea_state_factor = std::pow(10.0, f_theta * params_.morchin_sea_state);
+
+    // sinψ / cos²ψ
+    const Scalar cos_psi = std::cos(psi);
+    const Scalar cos_psi_sq = cos_psi * cos_psi;
+    const Scalar angle_term = sin_psi / std::max(EPSILON, cos_psi_sq);
+
+    // 粗糙度参数φ (简化：假设与载频相关)
+    const Scalar phi_rad = std::asin(std::min(1.0, 1.0 / (4.0 * PI * fc_hz * 1e-9)));
+
+    // β (转换为弧度)
+    const Scalar beta_rad = math::deg_to_rad(params_.morchin_beta_deg);
+
+    // exp(-tan²(β-φ) / tan²β)
+    const Scalar beta_minus_phi = beta_rad - phi_rad;
+    const Scalar tan_beta_minus_phi = std::tan(beta_minus_phi);
+    const Scalar tan_beta = std::tan(beta_rad);
+    const Scalar roughness_term = std::exp(-std::pow(tan_beta_minus_phi, 2) /
+                                            std::max(EPSILON, std::pow(tan_beta, 2)));
+
+    // 最终结果
+    const Scalar sigma0 = params_.morchin_base_coeff * sea_state_factor * angle_term * roughness_term;
+
+    return math::clamp_positive_eps(sigma0);
 }
 
 Complex SeaClutterModel::sample_complex_gaussian(std::mt19937_64& rng) const {

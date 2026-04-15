@@ -43,10 +43,10 @@ bool SeaClutterConfig::validate(std::string& error) const {
         return false;
     }
 
-    if (!std::isfinite(morchin_a0_db) || !std::isfinite(morchin_a_g) ||
-        !std::isfinite(morchin_a_f) || !std::isfinite(morchin_a_s) ||
-        !std::isfinite(morchin_sea_state) ||
-        !math::is_finite_positive(morchin_sin_psi_floor)) {
+    if (!std::isfinite(morchin_base_coeff) || !std::isfinite(morchin_theta_coeff) ||
+        !std::isfinite(morchin_theta_rate) || !std::isfinite(morchin_sea_state) ||
+        !std::isfinite(morchin_beta_deg) ||
+        !math::is_finite_positive(morchin_grazing_angle_floor)) {
         error = "Morchin params are invalid";
         return false;
     }

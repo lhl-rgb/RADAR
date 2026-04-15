@@ -60,12 +60,12 @@
     "doppler_center_hz": 0.0,
     "doppler_sigma_hz": 50.0,
     "pool_length_factor": 32,
-    "morchin_a0_db": -40.0,
-    "morchin_a_g": 10.0,
-    "morchin_a_f": 0.0,
-    "morchin_a_s": 1.0,
+    "morchin_base_coeff": 4.0e-5,
+    "morchin_theta_coeff": 0.65,
+    "morchin_theta_rate": 0.07,
     "morchin_sea_state": 5.0,
-    "morchin_sin_psi_floor": 1e-4
+    "morchin_beta_deg": 2.0,
+    "morchin_grazing_angle_floor": 1e-4
   },
   "target": {
     "enabled": true,
