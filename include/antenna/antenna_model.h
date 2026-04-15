@@ -126,6 +126,19 @@ public:
      */
     Scalar peak_gain_linear() const { return peak_gain_linear_; }
 
+    /**
+     * @brief 计算方位维 3dB 波束宽度（度）
+     * @details 对于均匀加权线阵，3dB 波束宽度 ≈ 0.886 / (N * d_lambda) 弧度
+     * @return 3dB 波束宽度（度）
+     */
+    Scalar beamwidth_3db_az_deg() const;
+
+    /**
+     * @brief 计算俯仰维 3dB 波束宽度（度）
+     * @return 3dB 波束宽度（度）
+     */
+    Scalar beamwidth_3db_el_deg() const;
+
 private:
     /**
      * @brief 刷新内部缓存（权重向量、峰值增益线性值）

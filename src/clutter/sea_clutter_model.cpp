@@ -401,8 +401,8 @@ bool SeaClutterModel::generate_cpi_sample_grid(const RadarSystemParams& system,
         const Scalar gain_linear = antenna.gain(beam_pointing.azimuth_deg, elevation_deg,
                                                  beam_pointing.azimuth_deg, beam_pointing.elevation_deg);
 
-        // 计算散射面积（假设方位宽度为波束宽度）
-        const Scalar d_az_rad = math::deg_to_rad(params_.beam_az_width_deg);
+        // 计算散射面积（方位宽度为天线 3dB 波束宽度）
+        const Scalar d_az_rad = math::deg_to_rad(antenna.beamwidth_3db_az_deg());
         const Scalar cell_area_m2 = math::clamp_nonnegative(ground_range_m) *
                                     math::clamp_positive_eps(range_bin_m) * d_az_rad;
 
@@ -488,16 +488,8 @@ bool SeaClutterModel::validate_params(const clutter::SeaClutterConfig& params, s
         return false;
     }
 
-    if (!math::is_finite_positive(params.range_step_m)) {
-        error = "range_step_m must be positive and finite.";
-        return false;
-    }
-    if (!math::is_finite_positive(params.beam_az_width_deg)) {
-        error = "beam_az_width_deg must be positive and finite.";
-        return false;
-    }
-    if (!math::is_finite_positive(params.az_step_deg)) {
-        error = "az_step_deg must be positive and finite.";
+    if (!math::is_finite_positive(params.az_grid_step_deg)) {
+        error = "az_grid_step_deg must be positive and finite.";
         return false;
     }
     if (!math::is_finite_positive(params.k_shape_nu)) {
@@ -703,11 +695,17 @@ std::vector<SeaClutterModel::CellInfo> SeaClutterModel::build_cells(
     Scalar ground_range_max_m,
     Scalar tau_ref_s) const {
     const Scalar antenna_height_m = math::clamp_nonnegative(system.antenna_height_m);
-    const Scalar d_az_rad = math::deg_to_rad(params_.az_step_deg);
+
+    // 使用天线 3dB 波束宽度和配置的方位网格步长
+    const Scalar beam_az_width_deg = antenna.beamwidth_3db_az_deg();
+    const Scalar d_az_rad = math::deg_to_rad(params_.az_grid_step_deg);
     const int az_count = std::max(
-        1, static_cast<int>(std::llround(params_.beam_az_width_deg / params_.az_step_deg)));
+        1, static_cast<int>(std::llround(beam_az_width_deg / params_.az_grid_step_deg)));
     const Scalar az_start_deg =
-        beam_pointing.azimuth_deg - 0.5 * params_.beam_az_width_deg + 0.5 * params_.az_step_deg;
+        beam_pointing.azimuth_deg - 0.5 * beam_az_width_deg + 0.5 * params_.az_grid_step_deg;
+
+    // 使用雷达系统的距离采样单元（range_bin_size_m = C/(2*fs)）
+    const Scalar range_step_m = system.range_bin_size_m;
 
     const Scalar tx_power_w = math::clamp_positive_eps(system.peak_power_w);
     const Scalar lambda_m = math::clamp_positive_eps(system.wavelength_m);
@@ -716,19 +714,19 @@ std::vector<SeaClutterModel::CellInfo> SeaClutterModel::build_cells(
 
     std::vector<CellInfo> cells;
     int range_index = 0;
-    for (Scalar rg_m = ground_range_min_m + 0.5 * params_.range_step_m; rg_m < ground_range_max_m;
-         rg_m += params_.range_step_m, ++range_index) {
+    for (Scalar rg_m = ground_range_min_m + 0.5 * range_step_m; rg_m < ground_range_max_m;
+         rg_m += range_step_m, ++range_index) {
         const Scalar grazing_rad =
             std::atan2(antenna_height_m, math::clamp_positive_eps(rg_m));
         const Scalar slant_range_m = std::sqrt(antenna_height_m * antenna_height_m + rg_m * rg_m);
         const Scalar cell_area_m2 =
-            math::clamp_nonnegative(rg_m) * params_.range_step_m * d_az_rad;
+            math::clamp_nonnegative(rg_m) * range_step_m * d_az_rad;
         const Scalar sigma0_linear = morchin_sigma0_linear(grazing_rad, system.fc_hz);
         const Scalar sigma_cell = sigma0_linear * cell_area_m2;
 
         for (int az_index = 0; az_index < az_count; ++az_index) {
             const Scalar azimuth_deg =
-                math::wrap_azimuth_deg(az_start_deg + static_cast<Scalar>(az_index) * params_.az_step_deg);
+                math::wrap_azimuth_deg(az_start_deg + static_cast<Scalar>(az_index) * params_.az_grid_step_deg);
             const Scalar elevation_deg = -math::rad_to_deg(grazing_rad);
             const Scalar gain_linear =
                 antenna.gain(azimuth_deg, elevation_deg, beam_pointing.azimuth_deg, beam_pointing.elevation_deg);

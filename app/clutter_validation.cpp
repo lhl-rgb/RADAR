@@ -460,9 +460,7 @@ void test_clutter_power_calculation(const ValidationOptions& /* opts */) {
     cfg.seed = 2026;
     cfg.ground_range_min_m = 1000.0;
     cfg.ground_range_max_m = 50000.0;
-    cfg.range_step_m = 100.0;
-    cfg.beam_az_width_deg = 3.0;
-    cfg.az_step_deg = 0.5;
+    cfg.az_grid_step_deg = 0.5;
     cfg.k_shape_nu = 0.8;
     cfg.doppler_center_hz = 0.0;
     cfg.doppler_sigma_hz = 20.0;

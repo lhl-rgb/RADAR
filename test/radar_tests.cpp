@@ -510,9 +510,7 @@ void test_sea_clutter() {
     cfg.enabled = true;
     cfg.ground_range_min_m = 1000.0;
     cfg.ground_range_max_m = 10000.0;
-    cfg.range_step_m = 15.0;  // 约一个距离 bin
-    cfg.beam_az_width_deg = 5.0;
-    cfg.az_step_deg = 1.0;
+    cfg.az_grid_step_deg = 1.0;
     cfg.k_shape_nu = 4.5;
     cfg.doppler_center_hz = 0.0;
     cfg.doppler_sigma_hz = 50.0;
@@ -754,9 +752,7 @@ void test_matlab_export() {
         cfg.enabled = true;
         cfg.ground_range_min_m = 1000.0;
         cfg.ground_range_max_m = 5000.0;
-        cfg.range_step_m = 15.0;
-        cfg.beam_az_width_deg = 5.0;
-        cfg.az_step_deg = 1.0;
+        cfg.az_grid_step_deg = 1.0;
         cfg.k_shape_nu = 4.5;
         cfg.doppler_center_hz = 0.0;
         cfg.doppler_sigma_hz = 50.0;

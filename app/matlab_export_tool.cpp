@@ -264,9 +264,7 @@ int main(int argc, char* argv[]) {
         clutter_cfg.enabled = true;
         clutter_cfg.ground_range_min_m = 1000.0;
         clutter_cfg.ground_range_max_m = 10000.0;
-        clutter_cfg.range_step_m = 15.0;
-        clutter_cfg.beam_az_width_deg = 5.0;
-        clutter_cfg.az_step_deg = 1.0;
+        clutter_cfg.az_grid_step_deg = 1.0;
         clutter_cfg.k_shape_nu = 4.5;
         clutter_cfg.doppler_center_hz = 0.0;
         clutter_cfg.doppler_sigma_hz = 50.0;

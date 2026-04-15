@@ -16,6 +16,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(RADAR_ENABLE_CUDA "Enable CUDA support" ON)
 option(RADAR_BUILD_TESTS "Build test targets" ON)
+option(RADAR_BUILD_MAIN_ONLY "Build only main applications (radar_app, matlab_export_tool)" OFF)
+option(RADAR_BUILD_VALIDATE_ONLY "Build only validation tools" OFF)
 
 if(RADAR_ENABLE_CUDA)
   include(CheckLanguage)
@@ -165,8 +167,22 @@ target_link_libraries(
 
 # 主程序
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app")
+  # 判断是否编译主程序
+  set(_radar_build_main OFF)
+  set(_radar_build_validate OFF)
+
+  if(RADAR_BUILD_MAIN_ONLY)
+    set(_radar_build_main ON)
+  elseif(RADAR_BUILD_VALIDATE_ONLY)
+    set(_radar_build_validate ON)
+  else()
+    # 默认全部编译
+    set(_radar_build_main ON)
+    set(_radar_build_validate ON)
+  endif()
+
   # 主雷达应用
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp")
+  if(_radar_build_main AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp")
     add_executable(radar_app "${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp")
     target_include_directories(radar_app PRIVATE "${PROJECT_SOURCE_DIR}/include")
     target_link_libraries(radar_app PRIVATE radar::modules radar::deps)
@@ -175,7 +191,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app")
   endif()
 
   # MATLAB 导出工具
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/matlab_export_tool.cpp")
+  if(_radar_build_main AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/matlab_export_tool.cpp")
     add_executable(matlab_export_tool "${CMAKE_CURRENT_SOURCE_DIR}/app/matlab_export_tool.cpp")
     target_include_directories(matlab_export_tool PRIVATE "${PROJECT_SOURCE_DIR}/include")
     target_link_libraries(matlab_export_tool PRIVATE radar::modules radar::deps)
@@ -184,7 +200,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app")
   endif()
 
   # 波形验证工具
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/waveform_validation.cpp")
+  if(_radar_build_validate AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/waveform_validation.cpp")
     add_executable(waveform_validation "${CMAKE_CURRENT_SOURCE_DIR}/app/waveform_validation.cpp")
     target_include_directories(waveform_validation PRIVATE "${PROJECT_SOURCE_DIR}/include")
     target_link_libraries(waveform_validation PRIVATE radar::modules radar::deps)
@@ -193,7 +209,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app")
   endif()
 
   # 天线验证工具
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/antenna_validation.cpp")
+  if(_radar_build_validate AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/antenna_validation.cpp")
     add_executable(antenna_validation "${CMAKE_CURRENT_SOURCE_DIR}/app/antenna_validation.cpp")
     target_include_directories(antenna_validation PRIVATE "${PROJECT_SOURCE_DIR}/include")
     target_link_libraries(antenna_validation PRIVATE radar::modules radar::deps)
@@ -202,7 +218,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app")
   endif()
 
   # 噪声验证工具
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/noise_validation.cpp")
+  if(_radar_build_validate AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/noise_validation.cpp")
     add_executable(noise_validation "${CMAKE_CURRENT_SOURCE_DIR}/app/noise_validation.cpp")
     target_include_directories(noise_validation PRIVATE "${PROJECT_SOURCE_DIR}/include")
     target_link_libraries(noise_validation PRIVATE radar::modules radar::deps)
@@ -211,7 +227,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app")
   endif()
 
   # 杂波验证工具
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/clutter_validation.cpp")
+  if(_radar_build_validate AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/clutter_validation.cpp")
     add_executable(clutter_validation "${CMAKE_CURRENT_SOURCE_DIR}/app/clutter_validation.cpp")
     target_include_directories(clutter_validation PRIVATE "${PROJECT_SOURCE_DIR}/include")
     target_link_libraries(clutter_validation PRIVATE radar::modules radar::deps)

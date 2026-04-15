@@ -64,8 +64,17 @@ Scalar AntennaModel::normalized_power_ula(Scalar target_az_deg,
     const Scalar theta = target_az_deg * PI / 180.0;
     const Scalar theta0 = beam_az_deg * PI / 180.0;
 
-    const Scalar psi =
-        2.0 * PI * config_.spacing_az_lambda * (std::sin(theta) - std::sin(theta0));
+    // ULA 线阵的有效扫描范围约为 ±60°（从阵列法线起算）
+    // 当 |θ - θ₀| > 90° 时，目标在阵列后半空间，应被抑制
+    // 使用相对角度判断：cos(θ - θ₀) > 0 表示目标在波束朝向前半空间
+    const Scalar rel_angle = theta - theta0;
+    const Scalar front_factor = std::cos(rel_angle);
+    if (front_factor < EPSILON) {
+        return 0.0;
+    }
+
+    // 标准 ULA 阵列因子相位差公式：ψ = kd * (sin(θ) - sin(θ₀))
+    const Scalar psi = 2.0 * PI * config_.spacing_az_lambda * (std::sin(theta) - std::sin(theta0));
 
     std::complex<Scalar> af(0.0, 0.0);
     for (int n = 0; n < config_.num_elements_az; ++n) {
@@ -84,13 +93,32 @@ Scalar AntennaModel::normalized_power_upa(Scalar target_az_deg, Scalar target_el
     const Scalar az0 = beam_az_deg * PI / 180.0;
     const Scalar el0 = beam_el_deg * PI / 180.0;
 
-    const Scalar u = std::cos(el) * std::sin(az);
-    const Scalar v = std::sin(el);
-    const Scalar u0 = std::cos(el0) * std::sin(az0);
-    const Scalar v0 = std::sin(el0);
+    // 旋转阵面模型：阵面法线随波束指向旋转
+    // 使用相对角度计算阵列因子（目标角度相对于阵面法线）
+    const Scalar rel_az = az - az0;
+    const Scalar rel_el = el - el0;
 
-    const Scalar psix = 2.0 * PI * config_.spacing_az_lambda * (u - u0);
-    const Scalar psiy = 2.0 * PI * config_.spacing_el_lambda * (v - v0);
+    // 前半空间约束：目标必须在阵面朝向的前半空间
+    const Scalar front_factor = std::cos(rel_el) * std::cos(rel_az);
+    if (front_factor <= 0.0) {
+        return 0.0;
+    }
+
+    // 工程扫描限制：方位±60°，俯仰±30°（超出后增益损失和栅瓣风险过大）
+    if (std::abs(rel_az) > 60.0 * PI / 180.0) {
+        return 0.0;
+    }
+    if (std::abs(rel_el) > 30.0 * PI / 180.0) {
+        return 0.0;
+    }
+
+    // 旋转阵面模型下的方向余弦（在阵列坐标系下）
+    const Scalar u = std::cos(rel_el) * std::sin(rel_az);
+    const Scalar v = std::sin(rel_el);
+
+    // 相位差：阵面法线对准波束，所以参考相位为 0
+    const Scalar psix = 2.0 * PI * config_.spacing_az_lambda * u;
+    const Scalar psiy = 2.0 * PI * config_.spacing_el_lambda * v;
 
     std::complex<Scalar> af(0.0, 0.0);
     for (int m = 0; m < config_.num_elements_az; ++m) {
@@ -132,6 +160,22 @@ std::vector<Scalar> AntennaModel::make_weights(int length,
     }
 
     return weights;
+}
+
+Scalar AntennaModel::beamwidth_3db_az_deg() const {
+    // 3dB 波束宽度近似公式：θ_3dB ≈ 0.886 / (N * d_lambda) 弧度
+    // 对于 Hamming 加权，波束宽度约为均匀加权的 1.3 倍
+    const Scalar k_factor = (config_.weight_type_az == AntennaWeightType::Hamming) ? 1.3 : 1.0;
+    const Scalar beamwidth_rad = k_factor * 0.886 /
+        (static_cast<Scalar>(config_.num_elements_az) * config_.spacing_az_lambda);
+    return math::rad_to_deg(beamwidth_rad);
+}
+
+Scalar AntennaModel::beamwidth_3db_el_deg() const {
+    const Scalar k_factor = (config_.weight_type_el == AntennaWeightType::Hamming) ? 1.3 : 1.0;
+    const Scalar beamwidth_rad = k_factor * 0.886 /
+        (static_cast<Scalar>(config_.num_elements_el) * config_.spacing_el_lambda);
+    return math::rad_to_deg(beamwidth_rad);
 }
 
 }  // namespace radar::antenna

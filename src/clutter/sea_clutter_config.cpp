@@ -22,16 +22,8 @@ bool SeaClutterConfig::validate(std::string& error) const {
         return false;
     }
 
-    if (!math::is_finite_positive(range_step_m)) {
-        error = "range_step_m must be positive and finite";
-        return false;
-    }
-    if (!math::is_finite_positive(beam_az_width_deg)) {
-        error = "beam_az_width_deg must be positive and finite";
-        return false;
-    }
-    if (!math::is_finite_positive(az_step_deg)) {
-        error = "az_step_deg must be positive and finite";
+    if (!math::is_finite_positive(az_grid_step_deg)) {
+        error = "az_grid_step_deg must be positive and finite";
         return false;
     }
     if (!math::is_finite_positive(k_shape_nu)) {

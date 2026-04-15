@@ -17,7 +17,18 @@
       "Bash(cd /home/lhlj/Radar/matlab/03 噪声仿真)",
       "Bash(matlab -batch \"run\\('compare_noise_cpp_matlab.m'\\); exit\")",
       "Bash(python3 -c ':*)",
-      "Bash(xxd \"matlab/05 杂波仿真/sea_clutter_sim/validate_clutter_generator.m\")"
+      "Bash(xxd \"matlab/05 杂波仿真/sea_clutter_sim/validate_clutter_generator.m\")",
+      "Bash(pip install:*)",
+      "Bash(cmake --build . -j8)",
+      "Bash(chmod +x \"/home/lhlj/Radar/run_radar_sync_windows.sh\")",
+      "Bash(git -C \"/home/lhlj/Radar\" status)",
+      "Bash(git -C \"/home/lhlj/Radar\" diff --staged)",
+      "Bash(git -C \"/home/lhlj/Radar\" diff)",
+      "Bash(git -C \"/home/lhlj/Radar\" log --oneline -10)",
+      "Bash(git -C \"/home/lhlj/Radar\" add \"CMakeLists.txt\" \"app/antenna_validation.cpp\" \"app/clutter_validation.cpp\" \"app/matlab_export_tool.cpp\" \"app/noise_validation.cpp\" \"app/waveform_validation.cpp\" \"config/radar_config.json\" \"docs/报告/梁宏乐 -20260410.md\" \"include/clutter/sea_clutter_config.h\" \"include/core/radar_config.h\" \"include/core/radar_system_params.h\" \"include/core/simulation_engine.h\" \"src/antenna/antenna_model.cpp\" \"src/clutter/sea_clutter_model.cpp\" \"src/core/radar_system_params.cpp\" \"src/core/simulation_engine.cpp\" \"src/noise/noise_engine.cpp\" \"src/target/target_config.cpp\" \"src/target/target_echo_synthesizer.cpp\" \"src/target/target_engine.cpp\" \"src/target/target_kinematics.cpp\" \"src/waveform/waveform_generator.cpp\" \"test/radar_tests.cpp\" \"include/core/tools/math_utils.h\" \"src/core/tools/math_utils.cpp\" \"run_radar_sync_windows.sh\" \"docs/报告/参考图\")",
+      "Bash(git -C \"/home/lhlj/Radar\" add -u \"include/core/data_exporter.h\" \"include/core/math_utils.h\" \"include/core/udp/udp_config.h\" \"include/core/udp/udp_sender.h\" \"src/core/data_exporter.cpp\" \"src/core/udp/udp_sender.cpp\")",
+      "Bash(git -C /home/lhlj/Radar commit -m ':*)",
+      "Bash(git -C \"/home/lhlj/Radar\" add \"CMakeLists.txt\" \"app/antenna_validation.cpp\" \"app/clutter_validation.cpp\" \"app/matlab_export_tool.cpp\" \"app/noise_validation.cpp\" \"app/waveform_validation.cpp\" \"config/radar_config.json\" \"docs/报告/梁宏乐 -20260410.md\" \"include/clutter/sea_clutter_config.h\" \"include/core/radar_config.h\" \"include/core/radar_system_params.h\" \"include/core/simulation_engine.h\" \"src/antenna/antenna_model.cpp\" \"src/clutter/sea_clutter_model.cpp\" \"src/core/radar_system_params.cpp\" \"src/core/simulation_engine.cpp\" \"src/noise/noise_engine.cpp\" \"src/target/target_config.cpp\" \"src/target/target_echo_synthesizer.cpp\" \"src/target/target_engine.cpp\" \"src/target/target_kinematics.cpp\" \"src/waveform/waveform_generator.cpp\" \"test/radar_tests.cpp\" \"include/core/tools/math_utils.h\" \"run_radar_sync_windows.sh\" \"docs/报告/参考图\" \"src/core/tools\")"
     ]
   }
 }

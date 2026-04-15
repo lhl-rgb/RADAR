@@ -623,6 +623,383 @@ void test_beam_scanner(const ValidationOptions& opts) {
     std::cout << "\n[OUTPUT] Exported: " << opts.output_dir << "/beam_scanner.csv" << std::endl;
 }
 
+void test_front_back_boundary(const ValidationOptions& opts) {
+    print_header("Test 8: Front/Back + 360 Boundary Check");
+
+    AntennaConfig cfg;
+    cfg.model_type = PhasedArrayModelType::UPA_2D;
+    cfg.num_elements_az = 16;
+    cfg.num_elements_el = 12;
+    cfg.spacing_az_lambda = 0.5;
+    cfg.spacing_el_lambda = 0.5;
+    cfg.peak_gain_db = 35.0;
+    cfg.weight_type_az = AntennaWeightType::Hamming;
+    cfg.weight_type_el = AntennaWeightType::Hamming;
+
+    AntennaModel model;
+    model.set_config(cfg);
+    model.initialize();
+
+    const Scalar beam_az = 0.0;
+    const Scalar beam_el = 0.0;
+    const Scalar target_el = 0.0;
+    const std::vector<Scalar> test_az = {0.0, 1.0, 359.0, 360.0, 180.0};
+
+    print_test_info("Beam pointing: (0, 0) deg");
+    print_test_info("Target elevation fixed at 0 deg");
+    std::cout << "\nBoundary check results:\n";
+    std::cout << "------------------------------------------------------------\n";
+    std::cout << std::left
+              << std::setw(12) << "TargetAz"
+              << std::setw(16) << "P_norm"
+              << std::setw(16) << "P_norm(dB)"
+              << std::setw(16) << "Gain(dBi)"
+              << "\n";
+    std::cout << "------------------------------------------------------------\n";
+
+    std::vector<GainRecord> records;
+    records.reserve(test_az.size());
+    for (const Scalar az : test_az) {
+        const Scalar norm_pwr = model.normalized_power(az, target_el, beam_az, beam_el);
+        const Scalar gain_db = model.gain_db(az, target_el, beam_az, beam_el);
+        const Scalar norm_db = (norm_pwr > 0.0) ? (10.0 * std::log10(norm_pwr)) : -100.0;
+
+        records.push_back({az, target_el, beam_az, beam_el,
+                           std::pow(10.0, gain_db / 10.0), gain_db, norm_pwr});
+
+        std::cout << std::setw(12) << std::fixed << std::setprecision(4) << az
+                  << std::setw(16) << norm_pwr
+                  << std::setw(16) << norm_db
+                  << std::setw(16) << gain_db
+                  << "\n";
+    }
+    std::cout << "------------------------------------------------------------\n";
+
+    export_gain_records(opts.output_dir + "/front_back_boundary.csv", records,
+                        "Front/back + 360 boundary check: UPA beam=(0,0), el=0, az={0,1,359,360,180}");
+
+    std::cout << "\n[OUTPUT] Exported: " << opts.output_dir << "/front_back_boundary.csv" << std::endl;
+}
+
+void test_ula_front_back_boundary(const ValidationOptions& opts) {
+    print_header("Test 9: ULA Front/Back Boundary Check");
+
+    AntennaConfig cfg;
+    cfg.model_type = PhasedArrayModelType::ULA_1D;
+    cfg.num_elements_az = 16;
+    cfg.num_elements_el = 1;
+    cfg.spacing_az_lambda = 0.5;
+    cfg.spacing_el_lambda = 0.5;
+    cfg.peak_gain_db = 30.0;
+    cfg.weight_type_az = AntennaWeightType::Uniform;
+    cfg.weight_type_el = AntennaWeightType::Uniform;
+
+    AntennaModel model;
+    model.set_config(cfg);
+    model.initialize();
+
+    const Scalar beam_az = 0.0;
+    const Scalar beam_el = 0.0;
+    const Scalar target_el = 0.0;
+    const std::vector<Scalar> test_az = {0.0, 1.0, 359.0, 360.0, 180.0, -1.0};
+
+    print_test_info("Parameters: N=16, d/lambda=0.5, Uniform, G_peak=30dB");
+    print_test_info("Beam pointing: 0 deg (ULA 1D)");
+    std::cout << "\nULA Boundary check results:\n";
+    std::cout << "------------------------------------------------------------\n";
+    std::cout << std::left
+              << std::setw(12) << "TargetAz"
+              << std::setw(16) << "P_norm"
+              << std::setw(16) << "P_norm(dB)"
+              << std::setw(16) << "Gain(dBi)"
+              << "\n";
+    std::cout << "------------------------------------------------------------\n";
+
+    std::vector<GainRecord> records;
+    records.reserve(test_az.size());
+    for (const Scalar az : test_az) {
+        const Scalar norm_pwr = model.normalized_power(az, target_el, beam_az, beam_el);
+        const Scalar gain_db = model.gain_db(az, target_el, beam_az, beam_el);
+        const Scalar norm_db = (norm_pwr > 0.0) ? (10.0 * std::log10(norm_pwr)) : -100.0;
+
+        records.push_back({az, target_el, beam_az, beam_el,
+                           std::pow(10.0, gain_db / 10.0), gain_db, norm_pwr});
+
+        std::cout << std::setw(12) << std::fixed << std::setprecision(4) << az
+                  << std::setw(16) << norm_pwr
+                  << std::setw(16) << norm_db
+                  << std::setw(16) << gain_db
+                  << "\n";
+    }
+    std::cout << "------------------------------------------------------------\n";
+
+    export_gain_records(opts.output_dir + "/ula_front_back_boundary.csv", records,
+                        "ULA front/back boundary check: ULA beam=0, az={0,1,359,360,180,-1}");
+
+    std::cout << "\n[OUTPUT] Exported: " << opts.output_dir << "/ula_front_back_boundary.csv" << std::endl;
+}
+
+void test_ula_full_scan_debug(const ValidationOptions& opts) {
+    print_header("Test 11: ULA Full Scan Debug (Per-Beam Target Angle Log)");
+
+    AntennaConfig cfg;
+    cfg.model_type = PhasedArrayModelType::ULA_1D;
+    cfg.num_elements_az = 16;
+    cfg.num_elements_el = 1;
+    cfg.spacing_az_lambda = 0.5;
+    cfg.spacing_el_lambda = 0.5;
+    cfg.peak_gain_db = 30.0;
+    cfg.weight_type_az = AntennaWeightType::Uniform;
+    cfg.weight_type_el = AntennaWeightType::Uniform;
+
+    AntennaModel model;
+    model.set_config(cfg);
+    model.initialize();
+
+    // 模拟你的配置：波束从 -178 到 180，步长 2 度
+    const std::vector<Scalar> beam_azs = []() {
+        std::vector<Scalar> beams;
+        for (Scalar az = -178.0; az <= 180.0; az += 2.0) {
+            beams.push_back(az);
+        }
+        return beams;
+    }();
+
+    // 你的两个目标
+    struct Target { int id; Scalar x, y, z; };
+    const std::vector<Target> targets = {
+        {1, 3000.0, 3000.0, 0.0},  // 应该在 45°
+        {2, 5000.0, 0.0, 0.0},     // 应该在 0°
+    };
+
+    print_test_info("Beam scan: -178 to 180 deg, step=2 deg");
+    print_test_info("Targets: T1(3000,3000,0), T2(5000,0,0)");
+
+    std::ofstream file(opts.output_dir + "/ula_full_scan_debug.csv");
+    file << std::scientific << std::setprecision(15);
+    file << "beam_az_deg,target_id,target_x,target_y,target_z,"
+         << "target_az_deg,target_el_deg,rel_angle_deg,cos_rel_angle,"
+         << "front_factor_pass,gain_linear,gain_db\n";
+
+    for (const Scalar beam_az : beam_azs) {
+        for (const auto& tgt : targets) {
+            // 计算目标角度（和 to_az_el_deg 一致）
+            const Scalar target_az = std::atan2(tgt.y, tgt.x) * 180.0 / PI;
+            const Scalar target_el = std::atan2(tgt.z, std::sqrt(tgt.x*tgt.x + tgt.y*tgt.y)) * 180.0 / PI;
+
+            // ULA 归一化功率
+            const Scalar norm_pwr = model.normalized_power(target_az, 0.0, beam_az, 0.0);
+            const Scalar gain_lin = model.peak_gain_linear() * norm_pwr;
+            const Scalar gain_db = (gain_lin > 0.0) ? (10.0 * std::log10(gain_lin)) : -100.0;
+
+            // 相对角度和门控
+            const Scalar rel_angle = target_az - beam_az;
+            const Scalar cos_rel = std::cos(rel_angle * PI / 180.0);
+            const bool front_pass = (cos_rel >= 1e-10);
+
+            file << beam_az << "," << tgt.id << ","
+                 << tgt.x << "," << tgt.y << "," << tgt.z << ","
+                 << target_az << "," << target_el << ","
+                 << rel_angle << "," << cos_rel << ","
+                 << (front_pass ? "YES" : "NO") << ","
+                 << gain_lin << "," << gain_db << "\n";
+        }
+    }
+    file.close();
+
+    // 打印关键波位的摘要
+    std::cout << "\nKey beam positions summary:\n";
+    std::cout << "--------------------------------------------------------------------------------\n";
+    std::cout << std::left
+              << std::setw(10) << "BeamAz"
+              << std::setw(10) << "Target"
+              << std::setw(12) << "TargetAz"
+              << std::setw(12) << "RelAngle"
+              << std::setw(12) << "cos(Rel)"
+              << std::setw(12) << "Gate"
+              << std::setw(12) << "Gain(dB)"
+              << "\n";
+    std::cout << "--------------------------------------------------------------------------------\n";
+
+    const std::vector<Scalar> key_beams = {43.0, 45.0, 47.0, 89.0, 90.0, 91.0, 133.0, 135.0, 137.0};
+    for (const Scalar ba : key_beams) {
+        for (const auto& tgt : targets) {
+            const Scalar t_az = std::atan2(tgt.y, tgt.x) * 180.0 / PI;
+            const Scalar rel = t_az - ba;
+            const Scalar cos_rel = std::cos(rel * PI / 180.0);
+            const bool gate = (cos_rel >= 1e-10);
+            const Scalar np = model.normalized_power(t_az, 0.0, ba, 0.0);
+            const Scalar g_db = (np > 0.0) ? (10.0 * std::log10(np) + cfg.peak_gain_db) : -100.0;
+
+            std::cout << std::setw(10) << std::fixed << std::setprecision(2) << ba
+                      << std::setw(10) << ("T" + std::to_string(tgt.id))
+                      << std::setw(12) << std::setprecision(4) << t_az
+                      << std::setw(12) << rel
+                      << std::setw(12) << cos_rel
+                      << std::setw(12) << (gate ? "YES" : "NO")
+                      << std::setw(12) << g_db
+                      << "\n";
+        }
+    }
+    std::cout << "--------------------------------------------------------------------------------\n";
+
+    std::cout << "\n[OUTPUT] Exported: " << opts.output_dir << "/ula_full_scan_debug.csv" << std::endl;
+    std::cout << "\nUse this file to check each beam's target angle computation and gating.\n";
+}
+
+void test_upa_full_scan_debug(const ValidationOptions& opts) {
+    print_header("Test 12: UPA Full Scan Debug (360 Ring Scan)");
+
+    AntennaConfig cfg;
+    cfg.model_type = PhasedArrayModelType::UPA_2D;
+    cfg.num_elements_az = 16;
+    cfg.num_elements_el = 8;
+    cfg.spacing_az_lambda = 0.5;
+    cfg.spacing_el_lambda = 0.5;
+    cfg.peak_gain_db = 30.0;
+    cfg.weight_type_az = AntennaWeightType::Hamming;
+    cfg.weight_type_el = AntennaWeightType::Hamming;
+
+    AntennaModel model;
+    model.set_config(cfg);
+    model.initialize();
+
+    struct Target { int id; Scalar x, y, z; };
+    const std::vector<Target> targets = {
+        {1, 3000.0, 3000.0, 0.0},  // 45 度方向
+        {2, 5000.0, 0.0, 0.0},     // 0 度方向
+    };
+
+    print_test_info("Beam scan: -178 to 180 deg, step=2 deg, el=0");
+    print_test_info("Targets: T1(3000,3000,0)@45°, T2(5000,0,0)@0°");
+
+    std::ofstream file(opts.output_dir + "/upa_full_scan_debug.csv");
+    file << std::scientific << std::setprecision(15);
+    file << "beam_az_deg,beam_el_deg,target_id,target_x,target_y,target_z,"
+         << "target_az_deg,target_el_deg,front_factor,gate_pass,gain_db\n";
+
+    const Scalar beam_el = 0.0;
+    const Scalar target_el = 0.0;
+
+    for (Scalar beam_az = -178.0; beam_az <= 180.0; beam_az += 2.0) {
+        for (const auto& tgt : targets) {
+            const Scalar t_az = std::atan2(tgt.y, tgt.x) * 180.0 / PI;
+            const Scalar t_el = std::atan2(tgt.z, std::sqrt(tgt.x*tgt.x + tgt.y*tgt.y)) * 180.0 / PI;
+
+            const Scalar front = std::cos(t_el * PI/180.0) * std::cos(t_az * PI/180.0);
+            const bool gate = (front >= 0.0);
+            const Scalar norm_pwr = model.normalized_power(t_az, t_el, beam_az, beam_el);
+            const Scalar gain_db = (norm_pwr > 0.0) ? (10.0 * std::log10(norm_pwr) + cfg.peak_gain_db) : -100.0;
+
+            file << beam_az << "," << beam_el << "," << tgt.id << ","
+                 << tgt.x << "," << tgt.y << "," << tgt.z << ","
+                 << t_az << "," << t_el << ","
+                 << front << "," << (gate ? "YES" : "NO") << "," << gain_db << "\n";
+        }
+    }
+    file.close();
+
+    std::cout << "\nKey beam positions (UPA):\n";
+    std::cout << "--------------------------------------------------------------------------------\n";
+    std::cout << std::left
+              << std::setw(10) << "BeamAz"
+              << std::setw(10) << "Target"
+              << std::setw(12) << "TargetAz"
+              << std::setw(14) << "FrontFactor"
+              << std::setw(10) << "Gate"
+              << std::setw(12) << "Gain(dB)"
+              << "\n";
+    std::cout << "--------------------------------------------------------------------------------\n";
+
+    const std::vector<Scalar> key_beams = {43.0, 45.0, 47.0, 89.0, 90.0, 91.0, 133.0, 135.0, 137.0, 178.0, 180.0};
+    for (const Scalar ba : key_beams) {
+        for (const auto& tgt : targets) {
+            const Scalar t_az = std::atan2(tgt.y, tgt.x) * 180.0 / PI;
+            const Scalar front = std::cos(0.0) * std::cos(t_az * PI/180.0);
+            const bool gate = (front >= 0.0);
+            const Scalar norm_pwr = model.normalized_power(t_az, 0.0, ba, 0.0);
+            const Scalar g_db = (norm_pwr > 0.0) ? (10.0 * std::log10(norm_pwr) + cfg.peak_gain_db) : -100.0;
+
+            std::cout << std::setw(10) << std::fixed << std::setprecision(1) << ba
+                      << std::setw(10) << ("T" + std::to_string(tgt.id))
+                      << std::setw(12) << std::setprecision(4) << t_az
+                      << std::setw(14) << front
+                      << std::setw(10) << (gate ? "YES" : "NO")
+                      << std::setw(12) << g_db
+                      << "\n";
+        }
+    }
+    std::cout << "--------------------------------------------------------------------------------\n";
+
+    std::cout << "\n[OUTPUT] Exported: " << opts.output_dir << "/upa_full_scan_debug.csv" << std::endl;
+}
+
+void test_ula_relative_angle_gating(const ValidationOptions& opts) {
+    print_header("Test 10: ULA Relative Angle Gating Check");
+
+    AntennaConfig cfg;
+    cfg.model_type = PhasedArrayModelType::ULA_1D;
+    cfg.num_elements_az = 16;
+    cfg.num_elements_el = 1;
+    cfg.spacing_az_lambda = 0.5;
+    cfg.spacing_el_lambda = 0.5;
+    cfg.peak_gain_db = 30.0;
+    cfg.weight_type_az = AntennaWeightType::Uniform;
+    cfg.weight_type_el = AntennaWeightType::Uniform;
+
+    AntennaModel model;
+    model.set_config(cfg);
+    model.initialize();
+
+    // 测试场景：目标固定在 45°，波束分别指向 0°, 45°, 90°, 135°, 180°
+    const Scalar target_az = 45.0;
+    const std::vector<Scalar> beam_azs = {0.0, 45.0, 90.0, 135.0, 180.0};
+
+    print_test_info("Target azimuth: 45 deg (fixed)");
+    print_test_info("Beam azimuths: 0, 45, 90, 135, 180 deg");
+    std::cout << "\nRelative angle gating results:\n";
+    std::cout << "------------------------------------------------------------\n";
+    std::cout << std::left
+              << std::setw(12) << "BeamAz"
+              << std::setw(12) << "RelAngle"
+              << std::setw(16) << "P_norm"
+              << std::setw(16) << "P_norm(dB)"
+              << std::setw(16) << "Gain(dBi)"
+              << "\n";
+    std::cout << "------------------------------------------------------------\n";
+
+    std::vector<GainRecord> records;
+    records.reserve(beam_azs.size());
+    for (const Scalar beam_az : beam_azs) {
+        const Scalar rel_angle_deg = target_az - beam_az;
+        const Scalar norm_pwr = model.normalized_power(target_az, 0.0, beam_az, 0.0);
+        const Scalar gain_db = model.gain_db(target_az, 0.0, beam_az, 0.0);
+        const Scalar norm_db = (norm_pwr > 0.0) ? (10.0 * std::log10(norm_pwr)) : -100.0;
+
+        records.push_back({target_az, 0.0, beam_az, 0.0,
+                           std::pow(10.0, gain_db / 10.0), gain_db, norm_pwr});
+
+        std::cout << std::setw(12) << std::fixed << std::setprecision(4) << beam_az
+                  << std::setw(12) << rel_angle_deg
+                  << std::setw(16) << norm_pwr
+                  << std::setw(16) << norm_db
+                  << std::setw(16) << gain_db
+                  << "\n";
+    }
+    std::cout << "------------------------------------------------------------\n";
+    std::cout << "\nExpected behavior:\n";
+    std::cout << "  - Beam 0°: rel=45°, visible (|45°| < 90°)\n";
+    std::cout << "  - Beam 45°: rel=0°, peak gain\n";
+    std::cout << "  - Beam 90°: rel=-45°, visible but reduced\n";
+    std::cout << "  - Beam 135°: rel=-90°, at boundary (should be ~0)\n";
+    std::cout << "  - Beam 180°: rel=-135°, blocked (|-135°| > 90°)\n";
+
+    export_gain_records(opts.output_dir + "/ula_relative_angle_gating.csv", records,
+                        "ULA relative angle gating: target=45deg, beam={0,45,90,135,180}deg");
+
+    std::cout << "\n[OUTPUT] Exported: " << opts.output_dir << "/ula_relative_angle_gating.csv" << std::endl;
+}
+
 // ============================================================================
 // 主函数
 // ============================================================================
@@ -674,6 +1051,11 @@ int main(int argc, char* argv[]) {
     }
 
     test_beam_scanner(opts);
+    test_front_back_boundary(opts);
+    test_ula_front_back_boundary(opts);
+    test_ula_full_scan_debug(opts);
+    test_upa_full_scan_debug(opts);
+    test_ula_relative_angle_gating(opts);
 
     // 输出汇总
     std::cout << "\n╔══════════════════════════════════════════════╗" << std::endl;

@@ -33,9 +33,10 @@ struct SeaClutterConfig {
     // 几何参数（PhysicalGrid 模式使用）
     Scalar ground_range_min_m = -1.0;   ///< 地距下限（m）；-1 表示跟随 RadarSystemParams
     Scalar ground_range_max_m = -1.0;   ///< 地距上限（m）；-1 表示跟随 RadarSystemParams
-    Scalar range_step_m = 100.0;        ///< 地距网格步长（m）
-    Scalar beam_az_width_deg = 3.0;     ///< 当前波位覆盖的方位角宽（度）
-    Scalar az_step_deg = 0.1;           ///< 方位网格步长（度）
+    Scalar az_grid_step_deg = 0.1;      ///< 方位仿真网格步长（度），用于杂波单元离散化
+
+    // 注：距离维步长使用 RadarSystemParams.range_bin_size_m（距离采样单元）
+    // 注：方位覆盖宽度由天线 3dB 波束宽度自动确定（AntennaModel::beamwidth_3db_az_deg）
 
     // 频谱参数
     Scalar k_shape_nu = 0.8;            ///< K 分布形状参数 nu（Gamma 纹理参数）
@@ -72,9 +73,7 @@ inline void from_json(const nlohmann::json& j, SeaClutterConfig& cfg) {
     // 几何参数
     if (j.contains("ground_range_min_m")) j.at("ground_range_min_m").get_to(cfg.ground_range_min_m);
     if (j.contains("ground_range_max_m")) j.at("ground_range_max_m").get_to(cfg.ground_range_max_m);
-    if (j.contains("range_step_m")) j.at("range_step_m").get_to(cfg.range_step_m);
-    if (j.contains("beam_az_width_deg")) j.at("beam_az_width_deg").get_to(cfg.beam_az_width_deg);
-    if (j.contains("az_step_deg")) j.at("az_step_deg").get_to(cfg.az_step_deg);
+    if (j.contains("az_grid_step_deg")) j.at("az_grid_step_deg").get_to(cfg.az_grid_step_deg);
 
     // 频谱参数
     if (j.contains("k_shape_nu")) j.at("k_shape_nu").get_to(cfg.k_shape_nu);
@@ -112,9 +111,7 @@ inline void to_json(nlohmann::json& j, const SeaClutterConfig& cfg) {
         {"seed", cfg.seed},
         {"ground_range_min_m", cfg.ground_range_min_m},
         {"ground_range_max_m", cfg.ground_range_max_m},
-        {"range_step_m", cfg.range_step_m},
-        {"beam_az_width_deg", cfg.beam_az_width_deg},
-        {"az_step_deg", cfg.az_step_deg},
+        {"az_grid_step_deg", cfg.az_grid_step_deg},
         {"k_shape_nu", cfg.k_shape_nu},
         {"doppler_center_hz", cfg.doppler_center_hz},
         {"doppler_sigma_hz", cfg.doppler_sigma_hz},
