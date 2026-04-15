@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1400 1000" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="flowBig" markerWidth="14" markerHeight="10" refX="12" refY="5" orient="auto">
+      <polygon points="0 0, 14 5, 0 10" fill="#c0392b"/>
+    </marker>
+    <linearGradient id="stageGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3498db"/>
+      <stop offset="50%" style="stop-color:#9b59b6"/>
+      <stop offset="100%" style="stop-color:#e74c3c"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="1000" fill="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"/>
+  <rect width="1400" height="1000" fill="#f8f9fa"/>
+
+  <!-- Title -->
+  <text x="700" y="45" text-anchor="middle" font-size="22" font-weight="bold" fill="#2c3e50">
+    Radar 回波仿真系统 - 数据流转图（汇报展示视角）
+  </text>
+  <text x="700" y="72" text-anchor="middle" font-size="14" fill="#7f8c8d">
+    从配置加载到回波输出的完整链路
+  </text>
+
+  <!-- Main Flow Curve -->
+  <path d="M150 150 Q400 150 500 300 T700 500 T1000 650 T1250 800"
+        stroke="url(#stageGrad)" stroke-width="4" fill="none" stroke-dasharray="10,5" opacity="0.3"/>
+
+  <!-- ====== STAGE 1: 配置加载 ====== -->
+  <g id="stage1" filter="url(#glow)">
+    <circle cx="200" cy="200" r="60" fill="#3498db" opacity="0.1" stroke="#3498db" stroke-width="3"/>
+    <rect x="120" y="150" width="160" height="100" rx="15" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+    <text x="200" y="185" text-anchor="middle" font-size="18" font-weight="bold" fill="white">1️⃣ 配置加载</text>
+    <text x="200" y="210" text-anchor="middle" font-size="11" fill="#e8f4f8">JSON → 对象 → 验证</text>
+    <text x="200" y="230" text-anchor="middle" font-size="10" fill="#d0e8f0">radar_config.json</text>
+
+    <!-- Icon -->
+    <text x="200" y="260" text-anchor="middle" font-size="30">📋</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M280 200 L400 250" stroke="#e74c3c" stroke-width="3" marker-end="url(#flowBig)"/>
+
+  <!-- ====== STAGE 2: 引擎初始化 ====== -->
+  <g id="stage2" filter="url(#glow)">
+    <circle cx="480" cy="320" r="70" fill="#9b59b6" opacity="0.1" stroke="#9b59b6" stroke-width="3"/>
+    <rect x="380" y="260" width="200" height="120" rx="15" fill="#9b59b6" stroke="#8e44ad" stroke-width="2"/>
+    <text x="480" y="295" text-anchor="middle" font-size="18" font-weight="bold" fill="white">2️⃣ 引擎初始化</text>
+    <text x="480" y="325" text-anchor="middle" font-size="10" fill="#e8daef">• 波形生成器</text>
+    <text x="480" y="342" text-anchor="middle" font-size="10" fill="#e8daef">• 天线波束扫描</text>
+    <text x="480" y="359" text-anchor="middle" font-size="10" fill="#e8daef">• 目标/杂波/噪声引擎</text>
+
+    <text x="480" y="395" text-anchor="middle" font-size="25">⚙️</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M580 350 L680 420" stroke="#e74c3c" stroke-width="3" marker-end="url(#flowBig)"/>
+
+  <!-- ====== STAGE 3: 扫描循环 ====== -->
+  <g id="stage3" filter="url(#glow)">
+    <circle cx="750" cy="520" r="80" fill="#e74c3c" opacity="0.1" stroke="#e74c3c" stroke-width="3"/>
+    <rect x="620" y="440" width="260" height="160" rx="15" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+    <text x="750" y="475" text-anchor="middle" font-size="18" font-weight="bold" fill="white">3️⃣ 扫描主循环</text>
+
+    <text x="750" y="505" text-anchor="middle" font-size="10" fill="#fadbd8">for each scan:</text>
+    <text x="750" y="525" text-anchor="middle" font-size="10" fill="#fadbd8">└─ for each CPI (波束):</text>
+    <text x="750" y="545" text-anchor="middle" font-size="10" fill="#fadbd8">&nbsp;&nbsp;├─ 更新波束指向</text>
+    <text x="750" y="565" text-anchor="middle" font-size="10" fill="#fadbd8">&nbsp;&nbsp;├─ 更新目标状态</text>
+    <text x="750" y="585" text-anchor="middle" font-size="10" fill="#fadbd8">&nbsp;&nbsp;└─ 生成回波信号</text>
+
+    <text x="750" y="615" text-anchor="middle" font-size="25">🔄</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M880 550 L1000 600" stroke="#e74c3c" stroke-width="3" marker-end="url(#flowBig)"/>
+
+  <!-- ====== STAGE 4: 回波生成详情 ====== -->
+  <g id="stage4">
+    <rect x="950" y="520" width="320" height="200" rx="15" fill="#fff" stroke="#3498db" stroke-width="2"/>
+    <text x="1110" y="550" text-anchor="middle" font-size="16" font-weight="bold" fill="#2c3e50">4️⃣ 回波生成细节</text>
+
+    <!-- Sub steps -->
+    <g id="sub-step-1">
+      <rect x="980" y="565" width="260" height="35" rx="5" fill="#ecf0f1" stroke="#bdc3c7"/>
+      <text x="1010" y="588" font-size="11" fill="#333">📡 发射波形</text>
+      <text x="1180" y="588" font-size="10" fill="#7f8c8d">s(t) = A·exp(jφ(t))</text>
+    </g>
+
+    <g id="sub-step-2">
+      <rect x="980" y="605" width="260" height="35" rx="5" fill="#e8f8f5" stroke="#27ae60"/>
+      <text x="1010" y="628" font-size="11" fill="#333">🎯 目标回波</text>
+      <text x="1180" y="628" font-size="10" fill="#7f8c8d">雷达方程 + Swerling</text>
+    </g>
+
+    <g id="sub-step-3">
+      <rect x="980" y="645" width="260" height="35" rx="5" fill="#fef5e7" stroke="#f39c12"/>
+      <text x="1010" y="668" font-size="11" fill="#333">🌊 海杂波</text>
+      <text x="1180" y="668" font-size="10" fill="#7f8c8d">Morchin 模型 + K 分布</text>
+    </g>
+
+    <g id="sub-step-4">
+      <rect x="980" y="685" width="260" height="35" rx="5" fill="#f4ecf7" stroke="#9b59b6"/>
+      <text x="1010" y="708" font-size="11" fill="#333">🔇 噪声</text>
+      <text x="1180" y="708" font-size="10" fill="#7f8c8d">n ~ CN(0, σ²)</text>
+    </g>
+  </g>
+
+  <!-- Arrow down -->
+  <path d="M1110 720 L1110 780" stroke="#e74c3c" stroke-width="3" marker-end="url(#flowBig)"/>
+
+  <!-- ====== STAGE 5: 数据输出 ====== -->
+  <g id="stage5" filter="url(#glow)">
+    <rect x="910" y="780" width="400" height="140" rx="15" fill="#27ae60" stroke="#1e8449" stroke-width="2"/>
+    <text x="1110" y="815" text-anchor="middle" font-size="18" font-weight="bold" fill="white">5️⃣ 数据输出</text>
+
+    <text x="1110" y="845" text-anchor="middle" font-size="11" fill="#e8f8f5">📁 files: iq_scan_*.dat / targets_*.csv / config.json</text>
+    <text x="1110" y="865" text-anchor="middle" font-size="11" fill="#e8f8f5">📡 UDP: 127.0.0.1:9000 → 信号处理机</text>
+    <text x="1110" y="885" text-anchor="middle" font-size="11" fill="#e8f8f5">📝 log: out/log/radar_sim.log</text>
+
+    <text x="950" y="905" text-anchor="middle" font-size="25">📤</text>
+  </g>
+
+  <!-- ====== Callout: Key Parameters ====== -->
+  <g id="callout-params">
+    <rect x="50" y="320" width="280" height="200" rx="10" fill="#fff" stroke="#f39c12" stroke-width="2"/>
+    <text x="190" y="350" text-anchor="middle" font-size="14" font-weight="bold" fill="#d68910">⚙️ 关键系统参数</text>
+
+    <line x1="80" y1="365" x2="300" y2="365" stroke="#f39c12" stroke-width="1"/>
+
+    <text x="90" y="390" font-size="11" fill="#333">载波频率</text>
+    <text x="200" y="390" font-size="11" font-weight="bold" fill="#e74c3c">10 GHz</text>
+
+    <text x="90" y="415" font-size="11" fill="#333">脉冲重复频率</text>
+    <text x="200" y="415" font-size="11" font-weight="bold" fill="#e74c3c">1.6 kHz</text>
+
+    <text x="90" y="440" font-size="11" fill="#333">信号带宽</text>
+    <text x="200" y="440" font-size="11" font-weight="bold" fill="#e74c3c">25 MHz</text>
+
+    <text x="90" y="465" font-size="11" fill="#333">脉冲宽度</text>
+    <text x="200" y="465" font-size="11" font-weight="bold" fill="#e74c3c">2 μs</text>
+
+    <text x="90" y="490" font-size="11" fill="#333">峰值功率</text>
+    <text x="200" y="490" font-size="11" font-weight="bold" fill="#e74c3c">5 kW</text>
+
+    <text x="90" y="515" font-size="11" fill="#333">CPI 脉冲数</text>
+    <text x="200" y="515" font-size="11" font-weight="bold" fill="#e74c3c">32</text>
+  </g>
+
+  <!-- ====== Callout: Antenna Scan ====== -->
+  <g id="callout-antenna">
+    <rect x="50" y="540" width="280" height="160" rx="10" fill="#fff" stroke="#3498db" stroke-width="2"/>
+    <text x="190" y="570" text-anchor="middle" font-size="14" font-weight="bold" fill="#2980b9">📡 天线扫描配置</text>
+
+    <line x1="80" y1="585" x2="300" y2="585" stroke="#3498db" stroke-width="1"/>
+
+    <text x="90" y="610" font-size="11" fill="#333">阵列类型</text>
+    <text x="200" y="610" font-size="11" font-weight="bold" fill="#3498db">16×8 UPA</text>
+
+    <text x="90" y="635" font-size="11" fill="#333">扫描范围</text>
+    <text x="200" y="635" font-size="11" font-weight="bold" fill="#3498db">60° ~ 120°</text>
+
+    <text x="90" y="660" font-size="11" fill="#333">方位步长</text>
+    <text x="200" y="660" font-size="11" font-weight="bold" fill="#3498db">2°</text>
+
+    <text x="90" y="685" font-size="11" fill="#333">波束总数</text>
+    <text x="200" y="685" font-size="11" font-weight="bold" fill="#3498db">31 个波位</text>
+  </g>
+
+  <!-- ====== Callout: Target Model ====== -->
+  <g id="callout-target">
+    <rect x="50" y="720" width="280" height="140" rx="10" fill="#fff" stroke="#9b59b6" stroke-width="2"/>
+    <text x="190" y="750" text-anchor="middle" font-size="14" font-weight="bold" fill="#8e44ad">🎯 目标模型</text>
+
+    <line x1="80" y1="765" x2="300" y2="765" stroke="#9b59b6" stroke-width="1"/>
+
+    <text x="90" y="790" font-size="11" fill="#333">目标 1</text>
+    <text x="200" y="790" font-size="11" fill="#555">R=7km, RCS=30m², Swerling 1</text>
+
+    <text x="90" y="815" font-size="11" fill="#333">目标 2</text>
+    <text x="200" y="815" font-size="11" fill="#555">R=5km, RCS=5m², Swerling 1</text>
+
+    <text x="90" y="840" font-size="11" fill="#333">运动模型</text>
+    <text x="200" y="840" font-size="11" font-weight="bold" fill="#9b59b6">静止/匀速/匀加速/变加速</text>
+  </g>
+
+  <!-- ====== Legend ====== -->
+  <g id="legend">
+    <rect x="1150" y="320" width="200" height="150" rx="10" fill="#fff" stroke="#95a5a6" stroke-width="2"/>
+    <text x="1250" y="345" text-anchor="middle" font-size="12" font-weight="bold" fill="#2c3e50">图例</text>
+
+    <rect x="1170" y="360" width="25" height="25" rx="5" fill="#3498db" stroke="#2980b9"/>
+    <text x="1205" y="378" font-size="10" fill="#333">配置输入</text>
+
+    <rect x="1170" y="395" width="25" height="25" rx="5" fill="#9b59b6" stroke="#8e44ad"/>
+    <text x="1205" y="413" font-size="10" fill="#333">处理模块</text>
+
+    <rect x="1170" y="430" width="25" height="25" rx="5" fill="#e74c3c" stroke="#c0392b"/>
+    <text x="1205" y="448" font-size="10" fill="#333">循环/迭代</text>
+
+    <rect x="1170" y="465" width="25" height="25" rx="5" fill="#27ae60" stroke="#1e8449"/>
+    <text x="1205" y="483" font-size="10" fill="#333">数据输出</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="700" y="970" text-anchor="middle" font-size="11" fill="#95a5a6">
+    Radar Echo Simulator v0.1.0 · C++17 · 相控阵雷达回波仿真
+  </text>
+</svg>

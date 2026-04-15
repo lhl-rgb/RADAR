@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1400 1000" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+    <linearGradient id="moduleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a90d9;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#2c5aa0;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="coreGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5cb85c;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#3d8b3d;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="outputGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0ad4e;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#d98305;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="configGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d9534f;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#a8323a;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="1000" fill="#f8f9fa"/>
+
+  <!-- Title -->
+  <text x="700" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">
+    Radar 回波仿真系统架构图（工程实现视角）
+  </text>
+
+  <!-- Main Application Layer -->
+  <g id="app-layer">
+    <rect x="550" y="55" width="300" height="50" rx="5" fill="url(#configGrad)" stroke="#333" stroke-width="1"/>
+    <text x="700" y="80" text-anchor="middle" font-size="14" font-weight="bold" fill="white">app/main.cpp</text>
+    <text x="700" y="95" text-anchor="middle" font-size="11" fill="white">程序入口 / 信号处理 / 日志初始化</text>
+  </g>
+
+  <!-- Configuration Manager -->
+  <g id="config-mgr">
+    <rect x="550" y="125" width="300" height="60" rx="5" fill="url(#coreGrad)" stroke="#333" stroke-width="1"/>
+    <text x="700" y="150" text-anchor="middle" font-size="14" font-weight="bold" fill="white">ConfigurationManager</text>
+    <text x="700" y="170" text-anchor="middle" font-size="11" fill="white">JSON 配置加载 / 验证 / 参数计算</text>
+  </g>
+
+  <!-- Simulation Engine -->
+  <g id="sim-engine">
+    <rect x="450" y="210" width="500" height="70" rx="5" fill="#2c3e50" stroke="#333" stroke-width="2"/>
+    <text x="700" y="240" text-anchor="middle" font-size="16" font-weight="bold" fill="white">SimulationEngine</text>
+    <text x="700" y="260" text-anchor="middle" font-size="12" fill="#ccc">仿真引擎核心 - CPI 循环调度 / 扫描控制 / 数据收集</text>
+  </g>
+
+  <!-- Arrow from Config to Engine -->
+  <line x1="700" y1="185" x2="700" y2="205" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Signal Processing Modules -->
+  <g id="waveform-module">
+    <rect x="50" y="310" width="200" height="70" rx="5" fill="url(#moduleGrad)" stroke="#333" stroke-width="1"/>
+    <text x="150" y="340" text-anchor="middle" font-size="13" font-weight="bold" fill="white">waveform</text>
+    <text x="150" y="360" text-anchor="middle" font-size="11" fill="#e0e0e0">WaveformGenerator</text>
+    <text x="150" y="375" text-anchor="middle" font-size="10" fill="#ccc">波形生成 (LFM/NLFM/相位编码)</text>
+  </g>
+
+  <g id="antenna-module">
+    <rect x="280" y="310" width="220" height="70" rx="5" fill="url(#moduleGrad)" stroke="#333" stroke-width="1"/>
+    <text x="390" y="340" text-anchor="middle" font-size="13" font-weight="bold" fill="white">antenna</text>
+    <text x="390" y="360" text-anchor="middle" font-size="11" fill="#e0e0e0">BeamScanner + AntennaModel</text>
+    <text x="390" y="375" text-anchor="middle" font-size="10" fill="#ccc">波束扫描 / 方向图计算</text>
+  </g>
+
+  <g id="target-module">
+    <rect x="530" y="310" width="220" height="70" rx="5" fill="url(#moduleGrad)" stroke="#333" stroke-width="1"/>
+    <text x="640" y="340" text-anchor="middle" font-size="13" font-weight="bold" fill="white">target</text>
+    <text x="640" y="360" text-anchor="middle" font-size="11" fill="#e0e0e0">TargetEngine</text>
+    <text x="640" y="375" text-anchor="middle" font-size="10" fill="#ccc">目标运动学 / 回波合成</text>
+  </g>
+
+  <g id="clutter-module">
+    <rect x="780" y="310" width="220" height="70" rx="5" fill="url(#moduleGrad)" stroke="#333" stroke-width="1"/>
+    <text x="890" y="340" text-anchor="middle" font-size="13" font-weight="bold" fill="white">clutter</text>
+    <text x="890" y="360" text-anchor="middle" font-size="11" fill="#e0e0e0">ClutterEngine</text>
+    <text x="890" y="375" text-anchor="middle" font-size="10" fill="#ccc">海杂波 (Morchin+K 分布)</text>
+  </g>
+
+  <g id="noise-module">
+    <rect x="1030" y="310" width="200" height="70" rx="5" fill="url(#moduleGrad)" stroke="#333" stroke-width="1"/>
+    <text x="1130" y="340" text-anchor="middle" font-size="13" font-weight="bold" fill="white">noise</text>
+    <text x="1130" y="360" text-anchor="middle" font-size="11" fill="#e0e0e0">NoiseEngine</text>
+    <text x="1130" y="375" text-anchor="middle" font-size="10" fill="#ccc">复高斯白噪声</text>
+  </g>
+
+  <!-- Arrows from Engine to Modules -->
+  <line x1="500" y1="280" x2="150" y2="305" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <line x1="560" y1="280" x2="390" y2="305" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="280" x2="640" y2="305" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <line x1="840" y1="280" x2="890" y2="305" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <line x1="900" y1="280" x2="1130" y2="305" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+  <!-- Target Sub-modules -->
+  <g id="target-sub">
+    <rect x="530" y="400" width="220" height="55" rx="5" fill="#34495e" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+    <text x="640" y="425" text-anchor="middle" font-size="11" font-weight="bold" fill="#ddd">TargetManager</text>
+    <text x="640" y="440" text-anchor="middle" font-size="10" fill="#aaa">目标状态管理 / 运动学外推</text>
+    <text x="640" y="452" text-anchor="middle" font-size="10" fill="#aaa">TargetEchoSynthesizer - 回波合成</text>
+  </g>
+
+  <!-- Clutter Sub-modules -->
+  <g id="clutter-sub">
+    <rect x="780" y="400" width="220" height="55" rx="5" fill="#34495e" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+    <text x="890" y="425" text-anchor="middle" font-size="11" font-weight="bold" fill="#ddd">SeaClutterModel</text>
+    <text x="890" y="440" text-anchor="middle" font-size="10" fill="#aaa">Morchin 模型 / K 分布调制</text>
+    <text x="890" y="452" text-anchor="middle" font-size="10" fill="#aaa">网格化 RCS 计算</text>
+  </g>
+
+  <!-- Arrows from parent modules to sub-modules -->
+  <line x1="640" y1="380" x2="640" y2="395" stroke="#888" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <line x1="890" y1="380" x2="890" y2="395" stroke="#888" stroke-width="1" marker-end="url(#arrowhead)"/>
+
+  <!-- Echo Combination -->
+  <g id="echo-combine">
+    <rect x="550" y="480" width="300" height="50" rx="5" fill="#16a085" stroke="#333" stroke-width="1"/>
+    <text x="700" y="505" text-anchor="middle" font-size="13" font-weight="bold" fill="white">回波叠加</text>
+    <text x="700" y="522" text-anchor="middle" font-size="11" fill="#e0e0e0">y_rx = y_target + y_clutter + y_noise</text>
+  </g>
+
+  <!-- Arrows to Echo Combine -->
+  <line x1="640" y1="455" x2="600" y2="475" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <line x1="890" y1="455" x2="800" y2="475" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <line x1="1130" y1="380" x2="1000" y2="475" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+  <!-- Output Layer -->
+  <g id="output-layer">
+    <rect x="200" y="560" width="280" height="70" rx="5" fill="url(#outputGrad)" stroke="#333" stroke-width="1"/>
+    <text x="340" y="590" text-anchor="middle" font-size="14" font-weight="bold" fill="white">DataExporter</text>
+    <text x="340" y="610" text-anchor="middle" font-size="11" fill="#fff">IQ 数据 (.dat) / 目标快照 (.csv) / 配置 (.json)</text>
+
+    <rect x="520" y="560" width="280" height="70" rx="5" fill="url(#outputGrad)" stroke="#333" stroke-width="1"/>
+    <text x="660" y="590" text-anchor="middle" font-size="14" font-weight="bold" fill="white">UdpSender</text>
+    <text x="660" y="610" text-anchor="middle" font-size="11" fill="#fff">UDP 数据包 → 信号处理机 (127.0.0.1:9000)</text>
+
+    <rect x="840" y="560" width="280" height="70" rx="5" fill="#9b59b6" stroke="#333" stroke-width="1"/>
+    <text x="980" y="590" text-anchor="middle" font-size="14" font-weight="bold" fill="white">外部依赖库</text>
+    <text x="980" y="610" text-anchor="middle" font-size="11" fill="#fff">Eigen3 / nlohmann_json / spdlog / GDAL / FFTW3</text>
+  </g>
+
+  <!-- Arrows from Echo Combine to Output -->
+  <line x1="600" y1="530" x2="340" y2="555" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="530" x2="660" y2="555" stroke="#666" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+  <!-- External Tools -->
+  <g id="validation-tools">
+    <rect x="50" y="670" width="260" height="90" rx="5" fill="#ecf0f1" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+    <text x="180" y="695" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">验证工具 (app/)</text>
+    <text x="180" y="715" text-anchor="middle" font-size="10" fill="#666">• waveform_validation - 波形验证</text>
+    <text x="180" y="730" text-anchor="middle" font-size="10" fill="#666">• antenna_validation - 天线验证</text>
+    <text x="180" y="745" text-anchor="middle" font-size="10" fill="#666">• noise/clutter_validation - 噪声/杂波验证</text>
+
+    <rect x="350" y="670" width="260" height="90" rx="5" fill="#ecf0f1" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+    <text x="480" y="695" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">MATLAB 导出工具</text>
+    <text x="480" y="715" text-anchor="middle" font-size="10" fill="#666">• matlab_export_tool.cpp</text>
+    <text x="480" y="730" text-anchor="middle" font-size="10" fill="#666">• 导出 .mat 格式供 MATLAB 分析</text>
+    <text x="480" y="745" text-anchor="middle" font-size="10" fill="#666">• 验证脚本：matlab/02-05 天线/噪声/杂波仿真/</text>
+
+    <rect x="650" y="670" width="260" height="90" rx="5" fill="#ecf0f1" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+    <text x="780" y="695" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">测试套件</text>
+    <text x="780" y="715" text-anchor="middle" font-size="10" fill="#666">• test/radar_tests.cpp</text>
+    <text x="780" y="730" text-anchor="middle" font-size="10" fill="#666">• 单元测试 + 集成测试</text>
+    <text x="780" y="745" text-anchor="middle" font-size="10" fill="#666">• CTest 集成</text>
+
+    <rect x="950" y="670" width="260" height="90" rx="5" fill="#ecf0f1" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+    <text x="1080" y="695" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">构建系统</text>
+    <text x="1080" y="715" text-anchor="middle" font-size="10" fill="#666">• CMakeLists.txt - 主构建配置</text>
+    <text x="1080" y="730" text-anchor="middle" font-size="10" fill="#666">• CMakePresets.json - 预设配置</text>
+    <text x="1080" y="745" text-anchor="middle" font-size="10" fill="#666">• rebuild.sh - 重建脚本</text>
+  </g>
+
+  <!-- Output Files -->
+  <g id="output-files">
+    <rect x="50" y="790" width="400" height="110" rx="5" fill="#fff" stroke="#333" stroke-width="2"/>
+    <text x="250" y="815" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">输出文件 (data/)</text>
+    <text x="250" y="835" text-anchor="middle" font-size="10" fill="#666">• iq_scan_*.dat - 原始 IQ 数据 (二进制)</text>
+    <text x="250" y="850" text-anchor="middle" font-size="10" fill="#666">• targets_scan_*.csv - 目标状态快照</text>
+    <text x="250" y="865" text-anchor="middle" font-size="10" fill="#666">• config_params.json - 导出配置参数</text>
+    <text x="250" y="885" text-anchor="middle" font-size="10" fill="#666">• out/log/radar_sim.log - 仿真日志</text>
+    <text x="250" y="900" text-anchor="middle" font-size="10" fill="#666">• out/bin/ - 可执行文件</text>
+
+    <rect x="480" y="790" width="420" height="110" rx="5" fill="#fff" stroke="#333" stroke-width="2"/>
+    <text x="690" y="815" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">核心数据结构 (include/core/types.h)</text>
+    <text x="690" y="835" text-anchor="middle" font-size="10" fill="#666">• Complex / ComplexVec - 复数信号类型</text>
+    <text x="690" y="850" text-anchor="middle" font-size="10" fill="#666">• PulseEcho - 单脉冲回波 (vector&lt;Complex&gt;)</text>
+    <text x="690" y="865" text-anchor="middle" font-size="10" fill="#666">• TargetState - 目标状态 (位置/速度/加速度/RCS)</text>
+    <text x="690" y="880" text-anchor="middle" font-size="10" fill="#666">• CpiEcho - CPI 回波结果 (多脉冲 + 波位信息)</text>
+    <text x="690" y="895" text-anchor="middle" font-size="10" fill="#666">• GeoCoord / AzEl / BeamPoint - 几何坐标</text>
+
+    <rect x="930" y="790" width="420" height="110" rx="5" fill="#fff" stroke="#333" stroke-width="2"/>
+    <text x="1140" y="815" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">枚举类型</text>
+    <text x="1140" y="835" text-anchor="middle" font-size="10" fill="#666">• WaveformType: LFM, NLFM, PHASE_CODED, CW</text>
+    <text x="1140" y="850" text-anchor="middle" font-size="10" fill="#666">• SwerlingType: 0~4 (RCS 起伏模型)</text>
+    <text x="1140" y="865" text-anchor="middle" font-size="10" fill="#666">• MotionModel: 静止/匀速/匀加速/变加速</text>
+    <text x="1140" y="880" text-anchor="middle" font-size="10" fill="#666">• NoiseLevelMode: ComplexSigma/NoisePower/ThermalKTB</text>
+    <text x="1140" y="895" text-anchor="middle" font-size="10" fill="#666">• ClutterDistribution: Rayleigh/Weibull/K 分布等</text>
+  </g>
+
+  <!-- Legend -->
+  <g id="legend" transform="translate(50, 920)">
+    <rect width="1300" height="60" fill="#e8e8e8" rx="5" stroke="#999"/>
+    <text x="60" y="25" font-size="11" font-weight="bold" fill="#333">图例:</text>
+
+    <rect x="100" y="35" width="20" height="15" fill="url(#moduleGrad)" stroke="#333"/>
+    <text x="125" y="47" font-size="10" fill="#333">信号处理模块</text>
+
+    <rect x="230" y="35" width="20" height="15" fill="#2c3e50" stroke="#333"/>
+    <text x="255" y="47" font-size="10" fill="#333">核心调度器</text>
+
+    <rect x="360" y="35" width="20" height="15" fill="url(#outputGrad)" stroke="#333"/>
+    <text x="385" y="47" font-size="10" fill="#333">数据输出</text>
+
+    <rect x="470" y="35" width="20" height="15" fill="#16a085" stroke="#333"/>
+    <text x="495" y="47" font-size="10" fill="#333">信号处理</text>
+
+    <rect x="580" y="35" width="20" height="15" fill="#ecf0f1" stroke="#333" stroke-dasharray="3,2"/>
+    <text x="605" y="47" font-size="10" fill="#333">辅助工具</text>
+
+    <line x1="720" y1="42" x2="750" y2="42" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="760" y="47" font-size="10" fill="#333">数据流/依赖</text>
+
+    <text x="1200" y="47" font-size="10" fill="#666" text-anchor="end">Radar Echo Simulator v0.1.0</text>
+  </g>
+</svg>

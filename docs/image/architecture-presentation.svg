@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow2" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#555"/>
+    </marker>
+    <linearGradient id="inputGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3498db;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#2980b9;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="processGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9b59b6;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#8e44ad;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="outputGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#27ae60;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#1e8449;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="storageGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f39c12;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#d68910;stop-opacity:1"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="900" fill="linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)"/>
+  <rect width="1400" height="900" fill="#fafafa"/>
+
+  <!-- Title -->
+  <text x="700" y="45" text-anchor="middle" font-size="22" font-weight="bold" fill="#2c3e50">
+    Radar 回波仿真系统架构图（汇报展示视角）
+  </text>
+  <text x="700" y="70" text-anchor="middle" font-size="14" fill="#7f8c8d">
+    模块化设计 · 实时仿真 · 多输出模式
+  </text>
+
+  <!-- Input Layer -->
+  <g id="input-layer" filter="url(#shadow)">
+    <rect x="100" y="100" width="250" height="100" rx="10" fill="url(#inputGrad)" stroke="#2980b9" stroke-width="2"/>
+    <text x="225" y="135" text-anchor="middle" font-size="16" font-weight="bold" fill="white">📄 配置文件</text>
+    <text x="225" y="160" text-anchor="middle" font-size="12" fill="#e0e0e0">radar_config.json</text>
+    <text x="225" y="185" text-anchor="middle" font-size="11" fill="#d0d0d0">系统参数 / 波形 / 天线 / 目标</text>
+
+    <rect x="400" y="100" width="250" height="100" rx="10" fill="url(#inputGrad)" stroke="#2980b9" stroke-width="2"/>
+    <text x="525" y="135" text-anchor="middle" font-size="16" font-weight="bold" fill="white">🎯 初始目标</text>
+    <text x="525" y="160" text-anchor="middle" font-size="12" fill="#e0e0e0">位置 / 速度 / RCS / 运动模型</text>
+    <text x="525" y="185" text-anchor="middle" font-size="11" fill="#d0d0d0">Swerling 起伏模型</text>
+
+    <rect x="700" y="100" width="250" height="100" rx="10" fill="url(#inputGrad)" stroke="#2980b9" stroke-width="2"/>
+    <text x="825" y="135" text-anchor="middle" font-size="16" font-weight="bold" fill="white">📡 天线配置</text>
+    <text x="825" y="160" text-anchor="middle" font-size="12" fill="#e0e0e0">相控阵 / 波束表</text>
+    <text x="825" y="185" text-anchor="middle" font-size="11" fill="#d0d0d0">16×8 阵元 / 方位扫描</text>
+
+    <rect x="1000" y="100" width="250" height="100" rx="10" fill="url(#inputGrad)" stroke="#2980b9" stroke-width="2"/>
+    <text x="1125" y="135" text-anchor="middle" font-size="16" font-weight="bold" fill="white">🌊 环境参数</text>
+    <text x="1125" y="160" text-anchor="middle" font-size="12" fill="#e0e0e0">海杂波 / 噪声</text>
+    <text x="1125" y="185" text-anchor="middle" font-size="11" fill="#d0d0d0">Morchin 模型 / K 分布</text>
+  </g>
+
+  <!-- Flow arrows down -->
+  <path d="M225 200 L225 230" stroke="#555" stroke-width="2" marker-end="url(#arrow2)"/>
+  <path d="M525 200 L525 230" stroke="#555" stroke-width="2" marker-end="url(#arrow2)"/>
+  <path d="M825 200 L825 230" stroke="#555" stroke-width="2" marker-end="url(#arrow2)"/>
+  <path d="M1125 200 L1125 230" stroke="#555" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Core Processing Layer -->
+  <g id="core-processing" filter="url(#shadow)">
+    <!-- Central Engine -->
+    <rect x="300" y="240" width="800" height="180" rx="15" fill="url(#processGrad)" stroke="#8e44ad" stroke-width="3"/>
+    <text x="700" y="275" text-anchor="middle" font-size="20" font-weight="bold" fill="white">⚙️ 仿真引擎 SimulationEngine</text>
+    <text x="700" y="300" text-anchor="middle" font-size="13" fill="#e8daef">CPI 循环调度 · 波束扫描控制 · 回波收集</text>
+
+    <!-- Sub modules inside engine -->
+    <g id="engine-waveform">
+      <rect x="330" y="320" width="140" height="80" rx="8" fill="#ffffff22" stroke="#fff" stroke-width="1"/>
+      <text x="400" y="345" text-anchor="middle" font-size="13" font-weight="bold" fill="white">🔊 波形生成</text>
+      <text x="400" y="365" text-anchor="middle" font-size="10" fill="#eee">LFM/NLFM/相位编码</text>
+      <text x="400" y="382" text-anchor="middle" font-size="9" fill="#ddd">25MHz 带宽 · 2μs 脉宽</text>
+    </g>
+
+    <g id="engine-antenna">
+      <rect x="490" y="320" width="140" height="80" rx="8" fill="#ffffff22" stroke="#fff" stroke-width="1"/>
+      <text x="560" y="345" text-anchor="middle" font-size="13" font-weight="bold" fill="white">📡 天线系统</text>
+      <text x="560" y="365" text-anchor="middle" font-size="10" fill="#eee">波束扫描 · 方向图</text>
+      <text x="560" y="382" text-anchor="middle" font-size="9" fill="#ddd">60°~120° · 步长 2°</text>
+    </g>
+
+    <g id="engine-target">
+      <rect x="650" y="320" width="140" height="80" rx="8" fill="#ffffff22" stroke="#fff" stroke-width="1"/>
+      <text x="720" y="345" text-anchor="middle" font-size="13" font-weight="bold" fill="white">🎯 目标引擎</text>
+      <text x="720" y="365" text-anchor="middle" font-size="10" fill="#eee">运动学 · 回波合成</text>
+      <text x="720" y="382" text-anchor="middle" font-size="9" fill="#ddd">Swerling 起伏 · 雷达方程</text>
+    </g>
+
+    <g id="engine-clutter">
+      <rect x="810" y="320" width="140" height="80" rx="8" fill="#ffffff22" stroke="#fff" stroke-width="1"/>
+      <text x="880" y="345" text-anchor="middle" font-size="13" font-weight="bold" fill="white">🌊 杂波引擎</text>
+      <text x="880" y="365" text-anchor="middle" font-size="10" fill="#eee">海杂波建模</text>
+      <text x="880" y="382" text-anchor="middle" font-size="9" fill="#ddd">Morchin + K 分布</text>
+    </g>
+
+    <g id="engine-noise">
+      <rect x="970" y="320" width="140" height="80" rx="8" fill="#ffffff22" stroke="#fff" stroke-width="1"/>
+      <text x="1040" y="345" text-anchor="middle" font-size="13" font-weight="bold" fill="white">🔇 噪声引擎</text>
+      <text x="1040" y="365" text-anchor="middle" font-size="10" fill="#eee">复高斯白噪声</text>
+      <text x="1040" y="382" text-anchor="middle" font-size="9" fill="#ddd">σ=1e-6 · 种子可配置</text>
+    </g>
+  </g>
+
+  <!-- Combine arrow -->
+  <path d="M700 420 L700 460" stroke="#555" stroke-width="3" marker-end="url(#arrow2)"/>
+
+  <!-- Signal Combination -->
+  <g id="signal-combine" filter="url(#shadow)">
+    <rect x="450" y="460" width="500" height="80" rx="10" fill="#1abc9c" stroke="#16a085" stroke-width="2"/>
+    <text x="700" y="490" text-anchor="middle" font-size="16" font-weight="bold" fill="white">🔀 回波叠加</text>
+    <text x="700" y="515" text-anchor="middle" font-size="13" fill="#e8f8f5">y_rx = y_target + y_clutter + y_noise</text>
+    <text x="700" y="532" text-anchor="middle" font-size="11" fill="#d0f0e8">32 脉冲/CPI · 复数 IQ 数据</text>
+  </g>
+
+  <!-- Output arrows -->
+  <path d="M550 540 L350 590" stroke="#555" stroke-width="2" marker-end="url(#arrow2)"/>
+  <path d="M700 540 L700 590" stroke="#555" stroke-width="2" marker-end="url(#arrow2)"/>
+  <path d="M850 540 L1050 590" stroke="#555" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Output Layer -->
+  <g id="output-layer" filter="url(#shadow)">
+    <rect x="150" y="590" width="400" height="140" rx="10" fill="url(#outputGrad2)" stroke="#1e8449" stroke-width="2"/>
+    <text x="350" y="625" text-anchor="middle" font-size="16" font-weight="bold" fill="white">📁 文件输出 DataExporter</text>
+    <text x="350" y="655" text-anchor="middle" font-size="12" fill="#e8f8f5">• iq_scan_*.dat - 原始 IQ 数据 (二进制)</text>
+    <text x="350" y="675" text-anchor="middle" font-size="12" fill="#e8f8f5">• targets_scan_*.csv - 目标状态快照</text>
+    <text x="350" y="695" text-anchor="middle" font-size="12" fill="#e8f8f5">• config_params.json - 配置参数</text>
+    <text x="350" y="720" text-anchor="middle" font-size="11" fill="#d0e8d8">输出目录：data/</text>
+  </g>
+
+  <rect x="500" y="590" width="400" height="140" rx="10" fill="#3498db" stroke="#2980b9" stroke-width="2" filter="url(#shadow)"/>
+  <text x="700" y="625" text-anchor="middle" font-size="16" font-weight="bold" fill="white">📊 实时流输出 UdpSender</text>
+  <text x="700" y="655" text-anchor="middle" font-size="12" fill="#ebf5fb">• UDP 数据包 → 信号处理机</text>
+  <text x="700" y="680" text-anchor="middle" font-size="12" fill="#ebf5fb">• 目标地址：127.0.0.1:9000</text>
+  <text x="700" y="705" text-anchor="middle" font-size="12" fill="#ebf5fb">• 低延迟 · 实时传输</text>
+  <text x="700" y="725" text-anchor="middle" font-size="11" fill="#d0e0f0">可选启用</text>
+
+  <rect x="850" y="590" width="400" height="140" rx="10" fill="url(#storageGrad)" stroke="#d68910" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1050" y="625" text-anchor="middle" font-size="16" font-weight="bold" fill="white">📝 日志与监控</text>
+  <text x="1050" y="655" text-anchor="middle" font-size="12" fill="#fef5e7">• out/log/radar_sim.log</text>
+  <text x="1050" y="675" text-anchor="middle" font-size="12" fill="#fef5e7">• 控制台彩色输出</text>
+  <text x="1050" y="695" text-anchor="middle" font-size="12" fill="#fef5e7">• spdlog 高性能日志</text>
+  <text x="1050" y="720" text-anchor="middle" font-size="11" fill="#f0e0d0">INFO 级别 · 结构化日志</text>
+
+  <!-- Key Features Box -->
+  <g id="features" filter="url(#shadow)">
+    <rect x="100" y="760" width="580" height="110" rx="10" fill="#fff" stroke="#bdc3c7" stroke-width="2"/>
+    <text x="390" y="785" text-anchor="middle" font-size="14" font-weight="bold" fill="#2c3e50">✨ 核心特性</text>
+
+    <text x="150" y="810" font-size="11" fill="#34495e">✅ 完整雷达链路仿真</text>
+    <text x="330" y="810" font-size="11" fill="#34495e">✅ 相控阵波束扫描</text>
+    <text x="510" y="810" font-size="11" fill="#34495e">✅ 多波形支持</text>
+
+    <text x="150" y="830" font-size="11" fill="#34495e">✅ Swerling RCS 起伏</text>
+    <text x="330" y="830" font-size="11" fill="#34495e">✅ 海杂波 K 分布调制</text>
+    <text x="510" y="830" font-size="11" fill="#34495e">✅ 可扩展模块设计</text>
+
+    <text x="150" y="855" font-size="11" fill="#7f8c8d">📌 10GHz 载频 · 1.6kHz PRF · 5kW 峰值功率</text>
+    <text x="450" y="855" font-size="11" fill="#7f8c8d">📌 1~10km 探测距离</text>
+
+    <rect x="720" y="760" width="580" height="110" rx="10" fill="#fff" stroke="#bdc3c7" stroke-width="2"/>
+    <text x="1010" y="785" text-anchor="middle" font-size="14" font-weight="bold" fill="#2c3e50">🛠️ 技术栈</text>
+
+    <text x="760" y="810" font-size="11" fill="#34495e">💻 C++17 · CMake</text>
+    <text x="940" y="810" font-size="11" fill="#34495e">📐 Eigen3 线性代数</text>
+
+    <text x="760" y="830" font-size="11" fill="#34495e">📝 nlohmann_json</text>
+    <text x="940" y="830" font-size="11" fill="#34495e">📊 spdlog 日志</text>
+
+    <text x="760" y="855" font-size="11" fill="#7f8c8d">📡 FFTW3 · GDAL</text>
+    <text x="1050" y="855" font-size="11" fill="#7f8c8d">🧪 单元测试覆盖</text>
+  </g>
+</svg>
