@@ -23,6 +23,12 @@ namespace radar {
 // - ExportConfig: data_exporter.h
 
 void from_json(const nlohmann::json& j, RadarConfig& cfg) {
+    if (j.contains("simulation")) {
+        j.at("simulation").get_to(cfg.simulation);
+    } else if (j.contains("scan_count")) {
+        j.at("scan_count").get_to(cfg.simulation.scan_count);
+    }
+
     // System parameters - use unified serializer
     if (j.contains("system")) {
         j.at("system").get_to(cfg.system);
@@ -104,6 +110,7 @@ bool ConfigurationManager::save_to_json(const std::string& filepath) const {
         nlohmann::json j;
 
         // Use unified to_json serializers
+        j["simulation"] = config_.simulation;
         j["system"] = config_.system;
         j["waveform"] = config_.waveform;
         j["antenna"] = config_.antenna;

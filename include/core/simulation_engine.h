@@ -181,6 +181,7 @@ private:
 
     /**
      * @brief 运行扫描循环（两层循环：scan → cpi）
+     * @details 扫描圈数由 RadarConfig::simulation.scan_count 配置。
      */
     void run_scan_loop();
 

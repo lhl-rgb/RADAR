@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <utility>
 
 #include <fftw3.h>
 
@@ -21,6 +22,49 @@ namespace {
 constexpr uint64_t kMixConst1 = 0x9e3779b97f4a7c15ULL;
 constexpr uint64_t kMixConst2 = 0xbf58476d1ce4e5b9ULL;
 constexpr uint64_t kMixConst3 = 0x94d049bb133111ebULL;
+
+constexpr Scalar kMorchinBaseCoeff = 4.0e-7;
+constexpr Scalar kMorchinSeaStateRate = 0.6;
+constexpr Scalar kMorchinBetaCoeff = 2.44 / 57.29;
+constexpr Scalar kMorchinBetaPower = 1.08;
+constexpr Scalar kMorchinRoughnessBase = 0.025;
+constexpr Scalar kMorchinRoughnessCoeff = 0.046;
+constexpr Scalar kMorchinRoughnessPower = 1.72;
+constexpr Scalar kMorchinTransitionPower = 1.9;
+
+Scalar compute_morchin_sigma0_linear(Scalar grazing_rad,
+                                     Scalar wavelength_m,
+                                     Scalar sea_state) {
+    const Scalar phi = math::clamp_positive_eps(grazing_rad);
+    const Scalar lambda_m = math::clamp_positive_eps(wavelength_m);
+    const Scalar ss = math::clamp_nonnegative(sea_state);
+    const Scalar ss_plus_one = ss + 1.0;
+
+    const Scalar beta = kMorchinBetaCoeff * std::pow(ss_plus_one, kMorchinBetaPower);
+    const Scalar tan_beta = std::max(std::tan(beta), EPSILON);
+    const Scalar tan_beta_sq = tan_beta * tan_beta;
+    const Scalar cot_beta_sq = 1.0 / tan_beta_sq;
+
+    const Scalar h_e =
+        kMorchinRoughnessBase + kMorchinRoughnessCoeff * std::pow(ss, kMorchinRoughnessPower);
+    const Scalar phi_c_arg =
+        std::clamp(lambda_m / std::max(EPSILON, 4.0 * PI * h_e), 0.0, 1.0);
+    const Scalar phi_c = std::max(std::asin(phi_c_arg), EPSILON);
+
+    const Scalar sigma0_c =
+        (phi < phi_c) ? std::pow(phi / phi_c, kMorchinTransitionPower) : 1.0;
+
+    const Scalar sin_phi = std::max(std::sin(phi), EPSILON);
+    const Scalar cot_phi = std::cos(phi) / sin_phi;
+    const Scalar diffuse_term =
+        (kMorchinBaseCoeff *
+         std::pow(10.0, kMorchinSeaStateRate * ss_plus_one) *
+         sigma0_c * sin_phi) / lambda_m;
+    const Scalar specular_term =
+        cot_beta_sq * std::exp(-(cot_phi * cot_phi) / tan_beta_sq);
+
+    return math::clamp_positive_eps(diffuse_term + specular_term);
+}
 
 class GaussianDopplerFftSynthesizer {
 public:
@@ -271,25 +315,7 @@ bool SeaClutterModel::generate_cpi(const RadarSystemParams& system,
         return true;
     }
 
-    // 根据网格模式选择生成方法
-    if (params_.grid_mode == SeaClutterGridMode::SampleGrid) {
-        return generate_cpi_sample_grid(system, antenna, beam_pointing, beam_index,
-                                        tx_waveform, out_clutter);
-    }
-
-    // === PhysicalGrid 模式 ===
-    const Scalar antenna_height_m = math::clamp_nonnegative(system.antenna_height_m);
-    const Scalar slant_ref_m =
-        std::sqrt(antenna_height_m * antenna_height_m + range_min_m * range_min_m);
-    const Scalar tau_ref_s = 2.0 * slant_ref_m / C;
-
-    const std::vector<CellInfo> cells =
-        build_cells(system, antenna, beam_pointing, range_min_m, range_max_m, tau_ref_s);
-    if (cells.empty()) {
-        return true;
-    }
-
-    // 检查并更新杂波池（如果需要）
+    // 检查并更新杂波池
     if (params_.sequence_mode == SeaClutterSequenceMode::SequencePoolMode) {
         if (pool_needs_update(system)) {
             if (!initialize_pool(system)) {
@@ -298,71 +324,43 @@ bool SeaClutterModel::generate_cpi(const RadarSystemParams& system,
         }
     }
 
-    for (const CellInfo& cell : cells) {
-        ComplexVec cell_sequence;
-
-        if (params_.sequence_mode == SeaClutterSequenceMode::InTimeMode) {
-            cell_sequence =
-                generate_sequence(static_cast<std::size_t>(system.pulses_per_cpi),
-                                         beam_index, cell.range_index, cell.az_index,
-                                         system.prf_hz, params_.doppler_center_hz,
-                                         params_.doppler_sigma_hz, params_.k_shape_nu);
-        } else {
-            // 从预生成的杂波池中截取
-            cell_sequence = extract_from_pool(beam_index, cell.range_index, cell.az_index,
-                                               static_cast<std::size_t>(system.pulses_per_cpi));
-        }
-
-        if (cell_sequence.empty()) {
-            last_error_ = "SeaClutterModel::generate_cpi failed: cell sequence generation failed.";
-            return false;
-        }
-
-        const Scalar amplitude = std::sqrt(math::clamp_nonnegative(cell.receive_power_w));
-        for (std::size_t p = 0; p < cell_sequence.size(); ++p) {
-            const Complex coeff = amplitude * cell_sequence[p];
-            auto& pulse = out_clutter.pulses[p];
-
-            for (std::size_t m = 0; m < tx_waveform.size(); ++m) {
-                const int sample_index = cell.start_sample_index + static_cast<int>(m);
-                if (sample_index < 0 ||
-                    sample_index >= static_cast<int>(system.samples_per_pulse)) {
-                    continue;
-                }
-                pulse[static_cast<std::size_t>(sample_index)] += coeff * tx_waveform[m];
-            }
-        }
+    std::vector<DelayBinContribution> contributions;
+    bool build_ok = false;
+    if (params_.grid_mode == SeaClutterGridMode::RangeSampleGrid) {
+        build_ok = build_range_sample_grid_contributions(
+            system, antenna, beam_pointing, beam_index, contributions);
+    } else {
+        build_ok = build_physical_grid_contributions(
+            system, antenna, beam_pointing, beam_index, range_min_m, range_max_m, contributions);
     }
+    if (!build_ok) {
+        return false;
+    }
+
+    synthesize_from_delay_contributions(
+        contributions, tx_waveform, system.samples_per_pulse, out_clutter);
 
     return true;
 }
 
-bool SeaClutterModel::generate_cpi_sample_grid(const RadarSystemParams& system,
-                                                 const AntennaModel& antenna,
-                                                 const BeamPoint& beam_pointing,
-                                                 int beam_index,
-                                                 const ComplexVec& tx_waveform,
-                                                 CpiEcho& out_clutter) {
-    // 简化模式：直接按采样点划分，不考虑方位维
+bool SeaClutterModel::build_range_sample_grid_contributions(
+    const RadarSystemParams& system,
+    const AntennaModel& antenna,
+    const BeamPoint& beam_pointing,
+    int beam_index,
+    std::vector<DelayBinContribution>& out_contributions) {
+    out_contributions.clear();
+
+    // 直接按距离采样单元划分，不再引入方位维
     const std::size_t num_samples = static_cast<std::size_t>(system.samples_per_pulse);
     const std::size_t num_pulses = static_cast<std::size_t>(system.pulses_per_cpi);
 
-    // 获取距离范围
-    Scalar range_min_m = 0.0;
-    Scalar range_max_m = 0.0;
+    Scalar range_min_m = -1.0;
+    Scalar range_max_m = -1.0;
     std::string error;
     if (!resolve_ground_range(system, range_min_m, range_max_m, error)) {
-        last_error_ = "generate_cpi_sample_grid failed: " + error;
+        last_error_ = "build_range_sample_grid_contributions failed: " + error;
         return false;
-    }
-
-    // 确保杂波池已初始化
-    if (params_.sequence_mode == SeaClutterSequenceMode::SequencePoolMode) {
-        if (pool_needs_update(system)) {
-            if (!initialize_pool(system)) {
-                return false;
-            }
-        }
     }
 
     const Scalar antenna_height_m = math::clamp_nonnegative(system.antenna_height_m);
@@ -375,42 +373,29 @@ bool SeaClutterModel::generate_cpi_sample_grid(const RadarSystemParams& system,
     const Scalar tx_power_w = math::clamp_positive_eps(system.peak_power_w);
     const Scalar lambda_m = math::clamp_positive_eps(system.wavelength_m);
     const Scalar system_loss_linear = math::clamp_positive_eps(system.system_loss_linear);
-    const Scalar four_pi_cubed = std::pow(4.0 * PI, 3.0);
 
-    // 生成每个采样点的幅度调制序列 (1 × num_samples)
+    // 每个距离采样单元一条长度 Np 的慢时间序列，先算其平均功率幅度
     std::vector<Scalar> amplitude(num_samples, 0.0);
 
     for (std::size_t s = 0; s < num_samples; ++s) {
-        // 计算该采样点对应的距离
         const Scalar tau_s = tau_ref_s + static_cast<Scalar>(s) / system.fs_hz;
         const Scalar slant_range_m = tau_s * C * 0.5;
-
-        // 只处理有效范围内的点
         if (slant_range_m < range_min_m || slant_range_m > range_max_m) {
             continue;
         }
 
-        // 计算地距和掠射角
         const Scalar ground_range_m = std::sqrt(slant_range_m * slant_range_m -
                                                  antenna_height_m * antenna_height_m);
         const Scalar grazing_rad = std::atan2(antenna_height_m,
                                               math::clamp_positive_eps(ground_range_m));
-
-        // 计算天线增益（固定方位，使用波束指向）
         const Scalar elevation_deg = -math::rad_to_deg(grazing_rad);
         const Scalar gain_linear = antenna.gain(beam_pointing.azimuth_deg, elevation_deg,
                                                  beam_pointing.azimuth_deg, beam_pointing.elevation_deg);
-
-        // 计算散射面积（方位宽度为天线 3dB 波束宽度）
         const Scalar d_az_rad = math::deg_to_rad(antenna.beamwidth_3db_az_deg());
         const Scalar cell_area_m2 = math::clamp_nonnegative(ground_range_m) *
                                     math::clamp_positive_eps(range_bin_m) * d_az_rad;
-
-        // 计算σ⁰
         const Scalar sigma0_linear = morchin_sigma0_linear(grazing_rad, system.fc_hz);
         const Scalar sigma_cell = sigma0_linear * cell_area_m2;
-
-        // 雷达方程计算接收功率
         const Scalar numerator = tx_power_w * gain_linear * gain_linear *
                                  lambda_m * lambda_m * sigma_cell;
         const Scalar denominator = four_pi_cubed *
@@ -422,54 +407,138 @@ bool SeaClutterModel::generate_cpi_sample_grid(const RadarSystemParams& system,
         amplitude[s] = std::sqrt(receive_power_w);
     }
 
-    // 为每个脉冲生成随机序列并乘以幅度
-    std::mt19937_64 rng(params_.seed ^ static_cast<uint64_t>(beam_index));
+    out_contributions.reserve(num_samples);
+    for (std::size_t s = 0; s < num_samples; ++s) {
+        if (amplitude[s] <= 0.0) {
+            continue;
+        }
 
-    for (std::size_t p = 0; p < num_pulses; ++p) {
-        auto& pulse = out_clutter.pulses[p];
-
-        // 生成该脉冲的随机序列
-        ComplexVec random_seq(num_samples, Complex(0.0, 0.0));
-
+        ComplexVec sample_sequence;
         if (params_.sequence_mode == SeaClutterSequenceMode::SequencePoolMode) {
-            // 从池中截取
-            const uint64_t pulse_seed = mix_u64(static_cast<uint64_t>(p) ^ params_.seed ^ kMixConst1);
-            const std::size_t start = static_cast<std::size_t>(pulse_seed % pool_cache_.sequence.size());
-
-            for (std::size_t s = 0; s < num_samples; ++s) {
-                const std::size_t idx = (start + s) % pool_cache_.sequence.size();
-                random_seq[s] = pool_cache_.sequence[idx];
-            }
+            sample_sequence = extract_from_pool(
+                beam_index, static_cast<int>(s), 0, num_pulses);
         } else {
-            // 实时生成
-            random_seq = generate_corr_sequence(num_samples, system.prf_hz,
+            sample_sequence = generate_sequence(num_pulses,
+                                                beam_index,
+                                                static_cast<int>(s),
+                                                0,
+                                                system.prf_hz,
                                                 params_.doppler_center_hz,
-                                                params_.doppler_sigma_hz, rng);
-            // 应用K分布
-            random_seq = apply_k_sirp(random_seq, params_.k_shape_nu, rng);
+                                                params_.doppler_sigma_hz,
+                                                params_.k_shape_nu);
+        }
+        if (sample_sequence.empty()) {
+            last_error_ =
+                "SeaClutterModel::build_range_sample_grid_contributions failed: "
+                "sample sequence generation failed.";
+            return false;
         }
 
-        // 归一化随机序列
-        normalize(random_seq);
-
-        // 幅度调制 + 波形卷积
-        for (std::size_t s = 0; s < num_samples; ++s) {
-            if (amplitude[s] <= 0.0) continue;
-
-            const Complex coeff = amplitude[s] * random_seq[s];
-
-            // 与发射波形卷积
-            for (std::size_t m = 0; m < tx_waveform.size(); ++m) {
-                const int sample_index = static_cast<int>(s) + static_cast<int>(m);
-                if (sample_index < 0 || sample_index >= static_cast<int>(num_samples)) {
-                    continue;
-                }
-                pulse[static_cast<std::size_t>(sample_index)] += coeff * tx_waveform[m];
-            }
+        DelayBinContribution contribution{};
+        contribution.delay_bin = static_cast<int>(s);
+        contribution.pulse_coeffs.assign(num_pulses, Complex(0.0, 0.0));
+        for (std::size_t p = 0; p < num_pulses; ++p) {
+            contribution.pulse_coeffs[p] = amplitude[s] * sample_sequence[p];
         }
+        out_contributions.push_back(std::move(contribution));
     }
 
     return true;
+}
+
+bool SeaClutterModel::build_physical_grid_contributions(
+    const RadarSystemParams& system,
+    const AntennaModel& antenna,
+    const BeamPoint& beam_pointing,
+    int beam_index,
+    Scalar ground_range_min_m,
+    Scalar ground_range_max_m,
+    std::vector<DelayBinContribution>& out_contributions) {
+    out_contributions.clear();
+
+    const Scalar antenna_height_m = math::clamp_nonnegative(system.antenna_height_m);
+    const Scalar slant_ref_m =
+        std::sqrt(antenna_height_m * antenna_height_m + ground_range_min_m * ground_range_min_m);
+    const Scalar tau_ref_s = 2.0 * slant_ref_m / C;
+
+    const std::vector<RangeRingInfo> range_rings = build_range_rings(
+        system, antenna, beam_pointing, ground_range_min_m, ground_range_max_m, tau_ref_s);
+    if (range_rings.empty()) {
+        return true;
+    }
+
+    const std::size_t num_pulses = static_cast<std::size_t>(system.pulses_per_cpi);
+    out_contributions.reserve(range_rings.size());
+    for (const RangeRingInfo& range_ring : range_rings) {
+        DelayBinContribution contribution{};
+        contribution.delay_bin = range_ring.start_sample_index;
+        contribution.pulse_coeffs.assign(num_pulses, Complex(0.0, 0.0));
+
+        for (const AzCellInfo& az_cell : range_ring.az_cells) {
+            ComplexVec cell_sequence;
+            if (params_.sequence_mode == SeaClutterSequenceMode::InTimeMode) {
+                cell_sequence = generate_sequence(num_pulses,
+                                                  beam_index,
+                                                  range_ring.range_index,
+                                                  az_cell.az_index,
+                                                  system.prf_hz,
+                                                  params_.doppler_center_hz,
+                                                  params_.doppler_sigma_hz,
+                                                  params_.k_shape_nu);
+            } else {
+                cell_sequence = extract_from_pool(beam_index,
+                                                  range_ring.range_index,
+                                                  az_cell.az_index,
+                                                  num_pulses);
+            }
+
+            if (cell_sequence.empty()) {
+                last_error_ =
+                    "SeaClutterModel::build_physical_grid_contributions failed: "
+                    "cell sequence generation failed.";
+                return false;
+            }
+
+            const Scalar amplitude = std::sqrt(math::clamp_nonnegative(az_cell.receive_power_w));
+            if (amplitude <= 0.0) {
+                continue;
+            }
+
+            for (std::size_t p = 0; p < num_pulses; ++p) {
+                contribution.pulse_coeffs[p] += amplitude * cell_sequence[p];
+            }
+        }
+
+        out_contributions.push_back(std::move(contribution));
+    }
+
+    return true;
+}
+
+void SeaClutterModel::synthesize_from_delay_contributions(
+    const std::vector<DelayBinContribution>& contributions,
+    const ComplexVec& tx_waveform,
+    int samples_per_pulse,
+    CpiEcho& out_clutter) const {
+    for (const DelayBinContribution& contribution : contributions) {
+        const int tx_begin = std::max(0, -contribution.delay_bin);
+        const int tx_end =
+            std::min(static_cast<int>(tx_waveform.size()), samples_per_pulse - contribution.delay_bin);
+        if (tx_begin >= tx_end) {
+            continue;
+        }
+
+        for (std::size_t p = 0; p < contribution.pulse_coeffs.size() &&
+                                p < out_clutter.pulses.size(); ++p) {
+            const Complex coeff = contribution.pulse_coeffs[p];
+            auto& pulse = out_clutter.pulses[p];
+            for (int m = tx_begin; m < tx_end; ++m) {
+                const int sample_index = contribution.delay_bin + m;
+                pulse[static_cast<std::size_t>(sample_index)] +=
+                    coeff * tx_waveform[static_cast<std::size_t>(m)];
+            }
+        }
+    }
 }
 
 bool SeaClutterModel::validate_params(const clutter::SeaClutterConfig& params, std::string& error) {
@@ -509,10 +578,7 @@ bool SeaClutterModel::validate_params(const clutter::SeaClutterConfig& params, s
         return false;
     }
 
-    if (!std::isfinite(params.morchin_base_coeff) || !std::isfinite(params.morchin_theta_coeff) ||
-        !std::isfinite(params.morchin_theta_rate) || !std::isfinite(params.morchin_sea_state) ||
-        !std::isfinite(params.morchin_beta_deg) ||
-        !math::is_finite_positive(params.morchin_grazing_angle_floor)) {
+    if (!std::isfinite(params.morchin_sea_state) || params.morchin_sea_state < 0.0) {
         error = "Morchin params are invalid.";
         return false;
     }
@@ -572,48 +638,9 @@ bool SeaClutterModel::resolve_ground_range(const RadarSystemParams& system,
 }
 
 Scalar SeaClutterModel::morchin_sigma0_linear(Scalar grazing_rad, Scalar fc_hz) const {
-    // 根据论文公式 (2-24) 实现 Morchin 模型
-    // σ₀ = 4×10⁻⁵ × 10^(f(θ,ss)×ss) × (sinψ / cos²ψ) × exp(-tan²(β-φ) / tan²β)
-    // 其中：
-    //   - f(θ,ss) = 0.65 + 0.07×θ (θ为入射角，单位度)
-    //   - ψ = grazing_rad (掠射角，弧度)
-    //   - φ = arcsin(1/(4π×fs)) (粗糙度参数，这里简化处理)
-    //   - β = morchin_beta_deg (与海态相关的粗糙度参数)
-
-    const Scalar psi = math::clamp_positive_eps(grazing_rad);
-    const Scalar sin_psi = std::max(std::sin(psi), params_.morchin_grazing_angle_floor);
-
-    // 入射角θ (度) = 90° - 掠射角 (度)
-    const Scalar theta_deg = 90.0 - math::rad_to_deg(psi);
-
-    // f(θ,ss) = 0.65 + 0.07×θ
-    const Scalar f_theta = params_.morchin_theta_coeff + params_.morchin_theta_rate * theta_deg;
-
-    // 10^(f(θ,ss)×ss)
-    const Scalar sea_state_factor = std::pow(10.0, f_theta * params_.morchin_sea_state);
-
-    // sinψ / cos²ψ
-    const Scalar cos_psi = std::cos(psi);
-    const Scalar cos_psi_sq = cos_psi * cos_psi;
-    const Scalar angle_term = sin_psi / std::max(EPSILON, cos_psi_sq);
-
-    // 粗糙度参数φ (简化：假设与载频相关)
-    const Scalar phi_rad = std::asin(std::min(1.0, 1.0 / (4.0 * PI * fc_hz * 1e-9)));
-
-    // β (转换为弧度)
-    const Scalar beta_rad = math::deg_to_rad(params_.morchin_beta_deg);
-
-    // exp(-tan²(β-φ) / tan²β)
-    const Scalar beta_minus_phi = beta_rad - phi_rad;
-    const Scalar tan_beta_minus_phi = std::tan(beta_minus_phi);
-    const Scalar tan_beta = std::tan(beta_rad);
-    const Scalar roughness_term = std::exp(-std::pow(tan_beta_minus_phi, 2) /
-                                            std::max(EPSILON, std::pow(tan_beta, 2)));
-
-    // 最终结果
-    const Scalar sigma0 = params_.morchin_base_coeff * sea_state_factor * angle_term * roughness_term;
-
-    return math::clamp_positive_eps(sigma0);
+    return compute_morchin_sigma0_linear(grazing_rad,
+                                         C / math::clamp_positive_eps(fc_hz),
+                                         params_.morchin_sea_state);
 }
 
 Complex SeaClutterModel::sample_complex_gaussian(std::mt19937_64& rng) const {
@@ -721,7 +748,8 @@ ComplexVec SeaClutterModel::generate_sequence_pool(std::size_t pool_length,
     return apply_k_sirp(gaussian, k_shape_nu, rng);
 }
 
-std::vector<SeaClutterModel::CellInfo> SeaClutterModel::build_cells(
+// === PhysicalGrid 模式 ===
+std::vector<SeaClutterModel::RangeRingInfo> SeaClutterModel::build_range_rings(
     const RadarSystemParams& system,
     const antenna::AntennaModel& antenna,
     const BeamPoint& beam_pointing,
@@ -738,15 +766,19 @@ std::vector<SeaClutterModel::CellInfo> SeaClutterModel::build_cells(
     const Scalar az_start_deg =
         beam_pointing.azimuth_deg - 0.5 * beam_az_width_deg + 0.5 * params_.az_grid_step_deg;
 
-    // 使用雷达系统的距离采样单元（range_bin_size_m = C/(2*fs)）
-    const Scalar range_step_m = system.range_bin_size_m;
+    // 使用雷达系统的距离分辨率（range_resolution_m = C/(2*B)）
+    const Scalar range_step_m = system.range_resolution_m;
 
     const Scalar tx_power_w = math::clamp_positive_eps(system.peak_power_w);
     const Scalar lambda_m = math::clamp_positive_eps(system.wavelength_m);
     const Scalar system_loss_linear = math::clamp_positive_eps(system.system_loss_linear);
-    const Scalar four_pi_cubed = std::pow(4.0 * PI, 3.0);
 
-    std::vector<CellInfo> cells;
+    const int range_count_estimate = std::max(
+        1, static_cast<int>(std::ceil((ground_range_max_m - ground_range_min_m) /
+                                      math::clamp_positive_eps(range_step_m))));
+
+    std::vector<RangeRingInfo> range_rings;
+    range_rings.reserve(static_cast<std::size_t>(range_count_estimate));
     int range_index = 0;
     for (Scalar rg_m = ground_range_min_m + 0.5 * range_step_m; rg_m < ground_range_max_m;
          rg_m += range_step_m, ++range_index) {
@@ -757,13 +789,25 @@ std::vector<SeaClutterModel::CellInfo> SeaClutterModel::build_cells(
             math::clamp_nonnegative(rg_m) * range_step_m * d_az_rad;
         const Scalar sigma0_linear = morchin_sigma0_linear(grazing_rad, system.fc_hz);
         const Scalar sigma_cell = sigma0_linear * cell_area_m2;
+        const Scalar tau_s = 2.0 * slant_range_m / C;
+
+        RangeRingInfo range_ring{};
+        range_ring.range_index = range_index;
+        range_ring.ground_range_m = rg_m;
+        range_ring.elevation_deg = -math::rad_to_deg(grazing_rad);
+        range_ring.slant_range_m = slant_range_m;
+        range_ring.start_sample_index = static_cast<int>(
+            std::llround((tau_s - tau_ref_s) * system.fs_hz));
+        range_ring.az_cells.reserve(static_cast<std::size_t>(az_count));
 
         for (int az_index = 0; az_index < az_count; ++az_index) {
             const Scalar azimuth_deg =
                 math::wrap_azimuth_deg(az_start_deg + static_cast<Scalar>(az_index) * params_.az_grid_step_deg);
-            const Scalar elevation_deg = -math::rad_to_deg(grazing_rad);
             const Scalar gain_linear =
-                antenna.gain(azimuth_deg, elevation_deg, beam_pointing.azimuth_deg, beam_pointing.elevation_deg);
+                antenna.gain(azimuth_deg,
+                             range_ring.elevation_deg,
+                             beam_pointing.azimuth_deg,
+                             beam_pointing.elevation_deg);
 
             const Scalar numerator = tx_power_w * gain_linear * gain_linear * lambda_m * lambda_m * sigma_cell;
             const Scalar denominator =
@@ -772,24 +816,17 @@ std::vector<SeaClutterModel::CellInfo> SeaClutterModel::build_cells(
             const Scalar receive_power_w =
                 math::clamp_nonnegative(math::safe_div(numerator, denominator));
 
-            const Scalar tau_s = 2.0 * slant_range_m / C;
-            const int start_sample_index = static_cast<int>(
-                std::llround((tau_s - tau_ref_s) * system.fs_hz));
-
-            CellInfo cell{};
-            cell.range_index = range_index;
-            cell.az_index = az_index;
-            cell.ground_range_m = rg_m;
-            cell.azimuth_deg = azimuth_deg;
-            cell.elevation_deg = elevation_deg;
-            cell.slant_range_m = slant_range_m;
-            cell.receive_power_w = receive_power_w;
-            cell.start_sample_index = start_sample_index;
-            cells.push_back(cell);
+            AzCellInfo az_cell{};
+            az_cell.az_index = az_index;
+            az_cell.azimuth_deg = azimuth_deg;
+            az_cell.receive_power_w = receive_power_w;
+            range_ring.az_cells.push_back(az_cell);
         }
+
+        range_rings.push_back(std::move(range_ring));
     }
 
-    return cells;
+    return range_rings;
 }
 
 }  // namespace radar

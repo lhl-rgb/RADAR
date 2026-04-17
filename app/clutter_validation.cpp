@@ -18,7 +18,7 @@
  *   - 杂波数据（CSV 格式，供 MATLAB 对比）
  *
  * 使用方法：
- *   ./clutter_validation --output_dir=out/clutter_validation
+ *   ./clutter_validation --output-dir out/clutter_validation
  */
 
 #include <iostream>
@@ -33,6 +33,7 @@
 #include <getopt.h>
 #include <numeric>
 #include <random>
+#include <algorithm>
 
 #include "core/types.h"
 #include "core/tools/math_utils.h"
@@ -151,6 +152,36 @@ bool export_sigma0_csv(const std::string& filepath,
     return true;
 }
 
+bool export_sigma0_curves_csv(const std::string& filepath,
+                              const std::vector<Scalar>& sea_states,
+                              const std::vector<Scalar>& grazing_angles_deg,
+                              const std::vector<std::vector<Scalar>>& sigma0_db_curves,
+                              const std::string& description = "") {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open: " << filepath << std::endl;
+        return false;
+    }
+
+    file << std::scientific << std::setprecision(15);
+    if (!description.empty()) {
+        file << "# " << description << "\n";
+    }
+    file << "sea_state,grazing_angle_deg,sigma0_db,sigma0_linear\n";
+
+    for (std::size_t s = 0; s < sea_states.size(); ++s) {
+        for (std::size_t i = 0; i < grazing_angles_deg.size(); ++i) {
+            const Scalar sigma0_db = sigma0_db_curves[s][i];
+            file << sea_states[s] << ","
+                 << grazing_angles_deg[i] << ","
+                 << sigma0_db << ","
+                 << math::db_to_linear(sigma0_db) << "\n";
+        }
+    }
+
+    return true;
+}
+
 // ============================================================================
 // 统计计算函数
 // ============================================================================
@@ -179,6 +210,36 @@ Scalar compute_amplitude_variance(const ComplexVec& data) {
         var += (amp - mean) * (amp - mean);
     }
     return var / data.size();
+}
+
+Scalar compute_morchin_sigma0_linear(const SeaClutterConfig& cfg,
+                                     Scalar grazing_rad,
+                                     Scalar fc_hz) {
+    const Scalar phi = math::clamp_positive_eps(grazing_rad);
+    const Scalar lambda_m = C / math::clamp_positive_eps(fc_hz);
+    const Scalar ss = math::clamp_nonnegative(cfg.morchin_sea_state);
+    const Scalar ss_plus_one = ss + 1.0;
+
+    const Scalar beta = (2.44 * std::pow(ss_plus_one, 1.08)) / 57.29;
+    const Scalar tan_beta = std::max(std::tan(beta), EPSILON);
+    const Scalar tan_beta_sq = tan_beta * tan_beta;
+    const Scalar cot_beta_sq = 1.0 / tan_beta_sq;
+
+    const Scalar h_e = 0.025 + 0.046 * std::pow(ss, 1.72);
+    const Scalar phi_c_arg =
+        std::clamp(lambda_m / std::max(EPSILON, 4.0 * PI * h_e), 0.0, 1.0);
+    const Scalar phi_c = std::max(std::asin(phi_c_arg), EPSILON);
+    const Scalar sigma0_c = (phi < phi_c) ? std::pow(phi / phi_c, 1.9) : 1.0;
+
+    const Scalar sin_phi = std::max(std::sin(phi), EPSILON);
+    const Scalar cot_phi = std::cos(phi) / sin_phi;
+    const Scalar diffuse_term =
+        (4.0e-7 * std::pow(10.0, 0.6 * ss_plus_one) * sigma0_c * sin_phi) /
+        math::clamp_positive_eps(lambda_m);
+    const Scalar specular_term =
+        cot_beta_sq * std::exp(-(cot_phi * cot_phi) / tan_beta_sq);
+
+    return math::clamp_positive_eps(diffuse_term + specular_term);
 }
 
 // K 分布形状参数估计（使用对数矩估计法 - 更准确）
@@ -251,55 +312,55 @@ void test_morchin_sigma0(const ValidationOptions& opts) {
     print_header("Test 1: Morchin Sigma0 Model");
 
     SeaClutterConfig cfg;
-    cfg.morchin_a0_db = -40.0;
-    cfg.morchin_a_g = 10.0;
-    cfg.morchin_a_f = 0.0;
-    cfg.morchin_a_s = 1.0;
-    cfg.morchin_sea_state = 3.0;
-    cfg.morchin_sin_psi_floor = 1e-4;
 
     RadarSystemParams sys;
-    sys.fc_hz = 10.0e9;  // 10 GHz
+    sys.fc_hz = 20.0e9;  // 与论文图示一致：20 GHz
 
     print_test_info("Morchin parameters:");
-    std::cout << "  a0_db = " << cfg.morchin_a0_db << " dB" << std::endl;
-    std::cout << "  a_g = " << cfg.morchin_a_g << std::endl;
-    std::cout << "  a_f = " << cfg.morchin_a_f << std::endl;
-    std::cout << "  a_s = " << cfg.morchin_a_s << std::endl;
-    std::cout << "  sea_state = " << cfg.morchin_sea_state << std::endl;
+    std::cout << "  model = paper Morchin formula (2-24, 2-25)" << std::endl;
+    std::cout << "  sea_state = 1, 2, 3, 4" << std::endl;
     std::cout << "  fc = " << sys.fc_hz / 1e9 << " GHz" << std::endl;
 
     // 计算不同掠射角下的σ⁰
     std::vector<Scalar> grazing_angles_deg;
-    std::vector<Scalar> sigma0_db_vec;
-
-    SeaClutterModel model(cfg);
-
-    for (Scalar angle_deg = 0.1; angle_deg <= 30.0; angle_deg += 0.5) {
-        Scalar angle_rad = math::deg_to_rad(angle_deg);
-        // 使用保护成员函数的方法 - 通过公开接口测试
-        // 这里我们直接用公式计算验证
-        const Scalar sin_psi = std::max(std::sin(angle_rad), cfg.morchin_sin_psi_floor);
-        const Scalar fc_ghz = sys.fc_hz * 1.0e-9;
-        const Scalar sigma0_db = cfg.morchin_a0_db +
-                                 cfg.morchin_a_g * std::log10(sin_psi) +
-                                 cfg.morchin_a_f * std::log10(fc_ghz) +
-                                 cfg.morchin_a_s * cfg.morchin_sea_state;
-
+    for (Scalar angle_deg = 0.1; angle_deg <= 89.6; angle_deg += 0.5) {
         grazing_angles_deg.push_back(angle_deg);
-        sigma0_db_vec.push_back(sigma0_db);
     }
 
-    export_sigma0_csv(opts.output_dir + "/morchin_sigma0.csv",
-                      grazing_angles_deg, sigma0_db_vec,
-                      "Morchin σ⁰ vs grazing angle");
+    const std::vector<Scalar> sea_states{1.0, 2.0, 3.0, 4.0};
+    std::vector<std::vector<Scalar>> sigma0_db_curves;
+    sigma0_db_curves.reserve(sea_states.size());
+
+    for (const Scalar sea_state : sea_states) {
+        cfg.morchin_sea_state = sea_state;
+        std::vector<Scalar> sigma0_db_vec;
+        sigma0_db_vec.reserve(grazing_angles_deg.size());
+        for (const Scalar angle_deg : grazing_angles_deg) {
+            const Scalar angle_rad = math::deg_to_rad(angle_deg);
+            const Scalar sigma0_linear =
+                compute_morchin_sigma0_linear(cfg, angle_rad, sys.fc_hz);
+            sigma0_db_vec.push_back(math::linear_to_db(sigma0_linear));
+        }
+        sigma0_db_curves.push_back(std::move(sigma0_db_vec));
+    }
+
+    export_sigma0_curves_csv(opts.output_dir + "/morchin_sigma0.csv",
+                             sea_states, grazing_angles_deg, sigma0_db_curves,
+                             "Paper Morchin sigma0 vs grazing angle");
 
     std::cout << "\nSample σ⁰ values:\n";
-    std::cout << "  Grazing Angle (deg)    σ⁰ (dB)\n";
-    std::cout << "  ----------------------------------------\n";
-    for (std::size_t i = 0; i < std::min(std::size_t(10), sigma0_db_vec.size()); ++i) {
-        std::cout << "  " << std::fixed << std::setw(18) << grazing_angles_deg[i]
-                  << std::setw(14) << sigma0_db_vec[i] << "\n";
+    std::cout << "  Sea State   Grazing Angle (deg)    σ⁰ (dB)\n";
+    std::cout << "  ------------------------------------------------\n";
+    const std::vector<Scalar> sample_angles_deg{1.0, 20.0, 80.0, 89.0};
+    for (std::size_t s = 0; s < sea_states.size(); ++s) {
+        cfg.morchin_sea_state = sea_states[s];
+        for (const Scalar angle_deg : sample_angles_deg) {
+            const Scalar sigma0_db = math::linear_to_db(
+                compute_morchin_sigma0_linear(cfg, math::deg_to_rad(angle_deg), sys.fc_hz));
+            std::cout << "  " << std::fixed << std::setw(11) << sea_states[s]
+                      << std::setw(23) << angle_deg
+                      << std::setw(14) << sigma0_db << "\n";
+        }
     }
 
     std::cout << "\n[OUTPUT] Exported: " << opts.output_dir << "/morchin_sigma0.csv" << std::endl;
@@ -456,7 +517,7 @@ void test_clutter_power_calculation(const ValidationOptions& /* opts */) {
     SeaClutterConfig cfg;
     cfg.enabled = true;
     cfg.sequence_mode = SeaClutterSequenceMode::SequencePoolMode;
-    cfg.grid_mode = SeaClutterGridMode::SampleGrid;
+    cfg.grid_mode = SeaClutterGridMode::RangeSampleGrid;
     cfg.seed = 2026;
     cfg.ground_range_min_m = 1000.0;
     cfg.ground_range_max_m = 50000.0;

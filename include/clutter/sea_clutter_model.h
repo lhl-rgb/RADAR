@@ -76,15 +76,24 @@ public:
                       CpiEcho& out_clutter);
 
 private:
-    struct CellInfo {
-        int range_index = 0;
-        int az_index = 0;
-        Scalar ground_range_m = 0.0;
-        Scalar azimuth_deg = 0.0;
-        Scalar elevation_deg = 0.0;
-        Scalar slant_range_m = 0.0;
-        Scalar receive_power_w = 0.0;
-        int start_sample_index = 0;
+    struct DelayBinContribution {
+        int delay_bin = 0;               ///< 延迟/距离采样单元索引
+        ComplexVec pulse_coeffs;         ///< 长度为 Np 的慢时间等效复系数
+    };
+
+    struct AzCellInfo {
+        int az_index = 0;                ///< 方位单元索引
+        Scalar azimuth_deg = 0.0;        ///< 方位角（度）
+        Scalar receive_power_w = 0.0;    ///< 接收功率（W）
+    };
+
+    struct RangeRingInfo {
+        int range_index = 0;                 ///< 距离单元索引
+        Scalar ground_range_m = 0.0;         ///< 地距（m）
+        Scalar elevation_deg = 0.0;          ///< 仰角（度）
+        Scalar slant_range_m = 0.0;          ///< 斜距（m）
+        int start_sample_index = 0;          ///< 在脉冲中的起始采样点索引
+        std::vector<AzCellInfo> az_cells;    ///< 该距离环上的方位子单元
     };
 
     /// 杂波池缓存参数
@@ -143,20 +152,34 @@ private:
     ComplexVec extract_from_pool(int beam_index, int range_index, int az_index,
                                   std::size_t length) const;
 
-    /// 生成CPI杂波 - SampleGrid模式（简化，按采样点划分）
-    bool generate_cpi_sample_grid(const RadarSystemParams& system,
-                                   const AntennaModel& antenna,
-                                   const BeamPoint& beam_pointing,
-                                   int beam_index,
-                                   const ComplexVec& tx_waveform,
-                                   CpiEcho& out_clutter);
+    /// 生成延迟系数 - RangeSampleGrid 模式（按距离采样单元划分）
+    bool build_range_sample_grid_contributions(const RadarSystemParams& system,
+                                               const AntennaModel& antenna,
+                                               const BeamPoint& beam_pointing,
+                                               int beam_index,
+                                               std::vector<DelayBinContribution>& out_contributions);
 
-    std::vector<CellInfo> build_cells(const RadarSystemParams& system,
-                                       const AntennaModel& antenna,
-                                       const BeamPoint& beam_pointing,
-                                       Scalar ground_range_min_m,
-                                       Scalar ground_range_max_m,
-                                       Scalar tau_ref_s) const;
+    /// 生成延迟系数 - PhysicalGrid 模式（按距离环+方位子单元划分）
+    bool build_physical_grid_contributions(const RadarSystemParams& system,
+                                           const AntennaModel& antenna,
+                                           const BeamPoint& beam_pointing,
+                                           int beam_index,
+                                           Scalar ground_range_min_m,
+                                           Scalar ground_range_max_m,
+                                           std::vector<DelayBinContribution>& out_contributions);
+
+    /// 共享的回波合成阶段：把延迟系数与发射信号卷积成 CPI 回波
+    void synthesize_from_delay_contributions(const std::vector<DelayBinContribution>& contributions,
+                                             const ComplexVec& tx_waveform,
+                                             int samples_per_pulse,
+                                             CpiEcho& out_clutter) const;
+
+    std::vector<RangeRingInfo> build_range_rings(const RadarSystemParams& system,
+                                                 const AntennaModel& antenna,
+                                                 const BeamPoint& beam_pointing,
+                                                 Scalar ground_range_min_m,
+                                                 Scalar ground_range_max_m,
+                                                 Scalar tau_ref_s) const;
 };
 
 }  // namespace radar

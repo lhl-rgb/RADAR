@@ -35,6 +35,8 @@ using Mat4 = Eigen::Matrix4d; ///< 4x4 矩阵。
 constexpr Scalar PI = 3.14159265358979323846; ///< 圆周率。
 constexpr Scalar C = 299792458.0;             ///< 光速（m/s）。
 constexpr Scalar EPSILON = 1e-10;             ///< 数值稳定性常数。
+constexpr Scalar four_pi_cubed =
+    (4.0 * PI) * (4.0 * PI) * (4.0 * PI); ///< 4π的三次方（常用于雷达方程）。
 
 //=============================
 // 几何/场景结构体
@@ -232,8 +234,9 @@ enum class SeaClutterSequenceMode {
  * @brief 海杂波网格划分模式
  */
 enum class SeaClutterGridMode {
-    PhysicalGrid,   ///< 按物理分辨率划分（距离分辨率+方位），精度高
-    SampleGrid      ///< 直接按采样点划分，速度快，忽略方位变化
+    PhysicalGrid,                   ///< 按物理分辨率划分（距离分辨率+方位），精度高
+    RangeSampleGrid,                ///< 按距离采样单元划分，每个距离单元生成长度 Np 的慢时间序列
+    SampleGrid = RangeSampleGrid    ///< 兼容旧命名
 };
 
 

@@ -16,7 +16,10 @@
 #include <limits>
 #include <algorithm>
 
+#include <fftw3.h>
+
 #include "core/types.h"
+#include "core/radar_config.h"
 #include "core/tools/math_utils.h"
 #include "core/radar_system_params.h"
 #include "waveform/waveform_generator.h"
@@ -36,6 +39,10 @@ namespace {
 
 int tests_passed = 0;
 int tests_failed = 0;
+
+constexpr uint64_t kSeaClutterMixConst1 = 0x9e3779b97f4a7c15ULL;
+constexpr uint64_t kSeaClutterMixConst2 = 0xbf58476d1ce4e5b9ULL;
+constexpr uint64_t kSeaClutterMixConst3 = 0x94d049bb133111ebULL;
 
 void assert_true(bool condition, const std::string& test_name, const std::string& detail = "") {
     if (condition) {
@@ -58,6 +65,482 @@ void assert_near(Scalar actual, Scalar expected, Scalar tol, const std::string& 
                          ", actual=" + std::to_string(actual) +
                          ", diff=" + std::to_string(diff);
     assert_true(pass, test_name, detail);
+}
+
+uint64_t mix_u64_ref(uint64_t value) {
+    value += kSeaClutterMixConst1;
+    value = (value ^ (value >> 30U)) * kSeaClutterMixConst2;
+    value = (value ^ (value >> 27U)) * kSeaClutterMixConst3;
+    return value ^ (value >> 31U);
+}
+
+uint64_t cell_seed_ref(uint64_t base_seed, int beam_index, int range_index, int az_index) {
+    uint64_t seed = mix_u64_ref(base_seed);
+    seed ^= mix_u64_ref(static_cast<uint64_t>(static_cast<uint32_t>(beam_index)) + kSeaClutterMixConst1);
+    seed ^= mix_u64_ref(static_cast<uint64_t>(static_cast<uint32_t>(range_index)) + kSeaClutterMixConst2);
+    seed ^= mix_u64_ref(static_cast<uint64_t>(static_cast<uint32_t>(az_index)) + kSeaClutterMixConst3);
+    return mix_u64_ref(seed);
+}
+
+Complex sample_complex_gaussian_ref(std::mt19937_64& rng) {
+    std::normal_distribution<Scalar> dist(0.0, 1.0);
+    const Scalar inv_sqrt2 = std::sqrt(0.5);
+    return Complex(inv_sqrt2 * dist(rng), inv_sqrt2 * dist(rng));
+}
+
+void normalize_ref(ComplexVec& sequence) {
+    if (sequence.empty()) {
+        return;
+    }
+
+    Scalar power = 0.0;
+    for (const Complex& x : sequence) {
+        power += std::norm(x);
+    }
+    power /= static_cast<Scalar>(sequence.size());
+    if (power <= EPSILON) {
+        return;
+    }
+
+    const Scalar scale = 1.0 / std::sqrt(power);
+    for (Complex& x : sequence) {
+        x *= scale;
+    }
+}
+
+ComplexVec inverse_dft_ref(const ComplexVec& spectrum) {
+    const std::size_t n = spectrum.size();
+    ComplexVec out_sequence(n, Complex(0.0, 0.0));
+    if (n == 0) {
+        return out_sequence;
+    }
+
+    fftw_complex* input = fftw_alloc_complex(static_cast<int>(n));
+    fftw_complex* output = fftw_alloc_complex(static_cast<int>(n));
+    if (input == nullptr || output == nullptr) {
+        if (input != nullptr) {
+            fftw_free(input);
+        }
+        if (output != nullptr) {
+            fftw_free(output);
+        }
+        return {};
+    }
+
+    for (std::size_t i = 0; i < n; ++i) {
+        input[i][0] = spectrum[i].real();
+        input[i][1] = spectrum[i].imag();
+    }
+
+    fftw_plan plan = fftw_plan_dft_1d(
+        static_cast<int>(n), input, output, FFTW_BACKWARD, FFTW_MEASURE);
+    if (plan == nullptr) {
+        fftw_free(input);
+        fftw_free(output);
+        return {};
+    }
+
+    fftw_execute(plan);
+
+    const Scalar inv_n = 1.0 / static_cast<Scalar>(n);
+    for (std::size_t sample_idx = 0; sample_idx < n; ++sample_idx) {
+        out_sequence[sample_idx] =
+            Complex(output[sample_idx][0], output[sample_idx][1]) * inv_n;
+    }
+
+    fftw_destroy_plan(plan);
+    fftw_free(input);
+    fftw_free(output);
+    return out_sequence;
+}
+
+ComplexVec generate_corr_sequence_ref(std::size_t length,
+                                      Scalar prf_hz,
+                                      Scalar doppler_center_hz,
+                                      Scalar doppler_sigma_hz,
+                                      std::mt19937_64& rng) {
+    if (length == 0) {
+        return {};
+    }
+
+    ComplexVec spectrum(length, Complex(0.0, 0.0));
+    const Scalar prf = math::clamp_positive_eps(prf_hz);
+    const Scalar sigma = math::clamp_positive_eps(doppler_sigma_hz);
+
+    for (std::size_t k = 0; k < length; ++k) {
+        const int index =
+            (k <= length / 2) ? static_cast<int>(k) : static_cast<int>(k) - static_cast<int>(length);
+        const Scalar freq_hz = index * prf / static_cast<Scalar>(length);
+        const Scalar z_score = (freq_hz - doppler_center_hz) / sigma;
+        const Scalar psd_weight = std::exp(-0.5 * z_score * z_score);
+        spectrum[k] = std::sqrt(math::clamp_nonnegative(psd_weight)) *
+                      sample_complex_gaussian_ref(rng);
+    }
+
+    ComplexVec sequence = inverse_dft_ref(spectrum);
+    normalize_ref(sequence);
+    return sequence;
+}
+
+ComplexVec apply_k_sirp_ref(const ComplexVec& base_sequence,
+                            Scalar k_shape_nu,
+                            std::mt19937_64& rng) {
+    if (base_sequence.empty()) {
+        return {};
+    }
+
+    ComplexVec output(base_sequence.size(), Complex(0.0, 0.0));
+    std::gamma_distribution<Scalar> gamma_dist(k_shape_nu, 1.0 / k_shape_nu);
+    for (std::size_t i = 0; i < base_sequence.size(); ++i) {
+        const Scalar tau = math::clamp_positive_eps(gamma_dist(rng));
+        output[i] = std::sqrt(tau) * base_sequence[i];
+    }
+
+    normalize_ref(output);
+    return output;
+}
+
+ComplexVec generate_sequence_ref(std::size_t length,
+                                 uint64_t base_seed,
+                                 int beam_index,
+                                 int range_index,
+                                 int az_index,
+                                 Scalar prf_hz,
+                                 Scalar doppler_center_hz,
+                                 Scalar doppler_sigma_hz,
+                                 Scalar k_shape_nu) {
+    std::mt19937_64 rng(cell_seed_ref(base_seed, beam_index, range_index, az_index));
+    const ComplexVec gaussian = generate_corr_sequence_ref(
+        length, prf_hz, doppler_center_hz, doppler_sigma_hz, rng);
+    return apply_k_sirp_ref(gaussian, k_shape_nu, rng);
+}
+
+ComplexVec generate_sequence_pool_ref(std::size_t pool_length,
+                                      uint64_t base_seed,
+                                      Scalar prf_hz,
+                                      Scalar doppler_center_hz,
+                                      Scalar doppler_sigma_hz,
+                                      Scalar k_shape_nu) {
+    const uint64_t seed = mix_u64_ref(base_seed ^ kSeaClutterMixConst1);
+    std::mt19937_64 rng(seed);
+    const ComplexVec gaussian = generate_corr_sequence_ref(
+        pool_length, prf_hz, doppler_center_hz, doppler_sigma_hz, rng);
+    return apply_k_sirp_ref(gaussian, k_shape_nu, rng);
+}
+
+ComplexVec extract_from_pool_ref(const ComplexVec& pool_sequence,
+                                 uint64_t base_seed,
+                                 int beam_index,
+                                 int range_index,
+                                 int az_index,
+                                 std::size_t length) {
+    if (pool_sequence.empty()) {
+        return {};
+    }
+
+    const uint64_t seed = cell_seed_ref(base_seed, beam_index, range_index, az_index);
+    const std::size_t start =
+        static_cast<std::size_t>(seed % static_cast<uint64_t>(pool_sequence.size()));
+
+    ComplexVec sequence(length, Complex(0.0, 0.0));
+    for (std::size_t p = 0; p < length; ++p) {
+        const std::size_t idx = (start + p) % pool_sequence.size();
+        sequence[p] = pool_sequence[idx];
+    }
+
+    normalize_ref(sequence);
+    return sequence;
+}
+
+Scalar morchin_sigma0_linear_ref(const clutter::SeaClutterConfig& cfg,
+                                 Scalar grazing_rad,
+                                 Scalar fc_hz) {
+    const Scalar phi = math::clamp_positive_eps(grazing_rad);
+    const Scalar lambda_m = C / math::clamp_positive_eps(fc_hz);
+    const Scalar ss = math::clamp_nonnegative(cfg.morchin_sea_state);
+    const Scalar ss_plus_one = ss + 1.0;
+
+    const Scalar beta = (2.44 * std::pow(ss_plus_one, 1.08)) / 57.29;
+    const Scalar tan_beta = std::max(std::tan(beta), EPSILON);
+    const Scalar tan_beta_sq = tan_beta * tan_beta;
+    const Scalar cot_beta_sq = 1.0 / tan_beta_sq;
+
+    const Scalar h_e = 0.025 + 0.046 * std::pow(ss, 1.72);
+    const Scalar phi_c_arg =
+        std::clamp(lambda_m / std::max(EPSILON, 4.0 * PI * h_e), 0.0, 1.0);
+    const Scalar phi_c = std::max(std::asin(phi_c_arg), EPSILON);
+    const Scalar sigma0_c = (phi < phi_c) ? std::pow(phi / phi_c, 1.9) : 1.0;
+
+    const Scalar sin_phi = std::max(std::sin(phi), EPSILON);
+    const Scalar cot_phi = std::cos(phi) / sin_phi;
+    const Scalar diffuse_term =
+        (4.0e-7 * std::pow(10.0, 0.6 * ss_plus_one) * sigma0_c * sin_phi) /
+        math::clamp_positive_eps(lambda_m);
+    const Scalar specular_term =
+        cot_beta_sq * std::exp(-(cot_phi * cot_phi) / tan_beta_sq);
+
+    return math::clamp_positive_eps(diffuse_term + specular_term);
+}
+
+Scalar morchin_critical_angle_ref(Scalar sea_state, Scalar fc_hz) {
+    const Scalar ss = math::clamp_nonnegative(sea_state);
+    const Scalar lambda_m = C / math::clamp_positive_eps(fc_hz);
+    const Scalar h_e = 0.025 + 0.046 * std::pow(ss, 1.72);
+    const Scalar phi_c_arg =
+        std::clamp(lambda_m / std::max(EPSILON, 4.0 * PI * h_e), 0.0, 1.0);
+    return std::max(std::asin(phi_c_arg), EPSILON);
+}
+
+CpiEcho generate_physical_grid_reference(const RadarSystemParams& system,
+                                         const clutter::SeaClutterConfig& cfg,
+                                         const antenna::AntennaModel& antenna,
+                                         const BeamPoint& beam_pointing,
+                                         int beam_index,
+                                         const ComplexVec& tx_waveform) {
+    CpiEcho out_clutter;
+    out_clutter.beam_index = beam_index;
+    out_clutter.azimuth_deg = beam_pointing.azimuth_deg;
+    out_clutter.elevation_deg = beam_pointing.elevation_deg;
+    out_clutter.pulses.assign(
+        static_cast<std::size_t>(system.pulses_per_cpi),
+        PulseEcho(static_cast<std::size_t>(system.samples_per_pulse), Complex(0.0, 0.0)));
+
+    if (!cfg.enabled) {
+        return out_clutter;
+    }
+
+    const Scalar range_min_m =
+        (cfg.ground_range_min_m < 0.0) ? system.min_range_m : cfg.ground_range_min_m;
+    const Scalar range_max_m =
+        (cfg.ground_range_max_m < 0.0) ? system.max_range_m : cfg.ground_range_max_m;
+
+    const Scalar antenna_height_m = math::clamp_nonnegative(system.antenna_height_m);
+    const Scalar slant_ref_m =
+        std::sqrt(antenna_height_m * antenna_height_m + range_min_m * range_min_m);
+    const Scalar tau_ref_s = 2.0 * slant_ref_m / C;
+    const Scalar beam_az_width_deg = antenna.beamwidth_3db_az_deg();
+    const Scalar d_az_rad = math::deg_to_rad(cfg.az_grid_step_deg);
+    const int az_count = std::max(
+        1, static_cast<int>(std::llround(beam_az_width_deg / cfg.az_grid_step_deg)));
+    const Scalar az_start_deg =
+        beam_pointing.azimuth_deg - 0.5 * beam_az_width_deg + 0.5 * cfg.az_grid_step_deg;
+    const Scalar range_step_m = system.range_resolution_m;
+    const Scalar tx_power_w = math::clamp_positive_eps(system.peak_power_w);
+    const Scalar lambda_m = math::clamp_positive_eps(system.wavelength_m);
+    const Scalar system_loss_linear = math::clamp_positive_eps(system.system_loss_linear);
+    const std::size_t num_pulses = static_cast<std::size_t>(system.pulses_per_cpi);
+
+    ComplexVec pool_sequence;
+    if (cfg.sequence_mode == SeaClutterSequenceMode::SequencePoolMode) {
+        const std::size_t pool_length = static_cast<std::size_t>(cfg.pool_length_factor) * num_pulses;
+        pool_sequence = generate_sequence_pool_ref(pool_length,
+                                                   cfg.seed,
+                                                   system.prf_hz,
+                                                   cfg.doppler_center_hz,
+                                                   cfg.doppler_sigma_hz,
+                                                   cfg.k_shape_nu);
+    }
+
+    int range_index = 0;
+    for (Scalar rg_m = range_min_m + 0.5 * range_step_m; rg_m < range_max_m;
+         rg_m += range_step_m, ++range_index) {
+        const Scalar grazing_rad =
+            std::atan2(antenna_height_m, math::clamp_positive_eps(rg_m));
+        const Scalar slant_range_m =
+            std::sqrt(antenna_height_m * antenna_height_m + rg_m * rg_m);
+        const Scalar cell_area_m2 =
+            math::clamp_nonnegative(rg_m) * range_step_m * d_az_rad;
+        const Scalar sigma0_linear = morchin_sigma0_linear_ref(cfg, grazing_rad, system.fc_hz);
+        const Scalar sigma_cell = sigma0_linear * cell_area_m2;
+        const Scalar tau_s = 2.0 * slant_range_m / C;
+        const int start_sample_index = static_cast<int>(
+            std::llround((tau_s - tau_ref_s) * system.fs_hz));
+        const Scalar elevation_deg = -math::rad_to_deg(grazing_rad);
+
+        for (int az_index = 0; az_index < az_count; ++az_index) {
+            const Scalar azimuth_deg = math::wrap_azimuth_deg(
+                az_start_deg + static_cast<Scalar>(az_index) * cfg.az_grid_step_deg);
+            const Scalar gain_linear =
+                antenna.gain(azimuth_deg,
+                             elevation_deg,
+                             beam_pointing.azimuth_deg,
+                             beam_pointing.elevation_deg);
+            const Scalar numerator =
+                tx_power_w * gain_linear * gain_linear * lambda_m * lambda_m * sigma_cell;
+            const Scalar denominator =
+                four_pi_cubed * std::pow(math::clamp_positive_eps(slant_range_m), 4.0) *
+                system_loss_linear;
+            const Scalar receive_power_w =
+                math::clamp_nonnegative(math::safe_div(numerator, denominator));
+
+            ComplexVec cell_sequence;
+            if (cfg.sequence_mode == SeaClutterSequenceMode::InTimeMode) {
+                cell_sequence = generate_sequence_ref(num_pulses,
+                                                      cfg.seed,
+                                                      beam_index,
+                                                      range_index,
+                                                      az_index,
+                                                      system.prf_hz,
+                                                      cfg.doppler_center_hz,
+                                                      cfg.doppler_sigma_hz,
+                                                      cfg.k_shape_nu);
+            } else {
+                cell_sequence = extract_from_pool_ref(pool_sequence,
+                                                      cfg.seed,
+                                                      beam_index,
+                                                      range_index,
+                                                      az_index,
+                                                      num_pulses);
+            }
+
+            const Scalar amplitude = std::sqrt(math::clamp_nonnegative(receive_power_w));
+            for (std::size_t pulse_idx = 0; pulse_idx < num_pulses; ++pulse_idx) {
+                const Complex coeff = amplitude * cell_sequence[pulse_idx];
+                auto& pulse = out_clutter.pulses[pulse_idx];
+                for (std::size_t sample_offset = 0; sample_offset < tx_waveform.size(); ++sample_offset) {
+                    const int sample_index =
+                        start_sample_index + static_cast<int>(sample_offset);
+                    if (sample_index < 0 || sample_index >= system.samples_per_pulse) {
+                        continue;
+                    }
+                    pulse[static_cast<std::size_t>(sample_index)] += coeff * tx_waveform[sample_offset];
+                }
+            }
+        }
+    }
+
+    return out_clutter;
+}
+
+CpiEcho generate_range_sample_grid_reference(const RadarSystemParams& system,
+                                             const clutter::SeaClutterConfig& cfg,
+                                             const antenna::AntennaModel& antenna,
+                                             const BeamPoint& beam_pointing,
+                                             int beam_index,
+                                             const ComplexVec& tx_waveform) {
+    CpiEcho out_clutter;
+    out_clutter.beam_index = beam_index;
+    out_clutter.azimuth_deg = beam_pointing.azimuth_deg;
+    out_clutter.elevation_deg = beam_pointing.elevation_deg;
+    out_clutter.pulses.assign(
+        static_cast<std::size_t>(system.pulses_per_cpi),
+        PulseEcho(static_cast<std::size_t>(system.samples_per_pulse), Complex(0.0, 0.0)));
+
+    if (!cfg.enabled) {
+        return out_clutter;
+    }
+
+    const Scalar range_min_m =
+        (cfg.ground_range_min_m < 0.0) ? system.min_range_m : cfg.ground_range_min_m;
+    const Scalar range_max_m =
+        (cfg.ground_range_max_m < 0.0) ? system.max_range_m : cfg.ground_range_max_m;
+    const Scalar antenna_height_m = math::clamp_nonnegative(system.antenna_height_m);
+    const Scalar slant_ref_m =
+        std::sqrt(antenna_height_m * antenna_height_m + range_min_m * range_min_m);
+    const Scalar tau_ref_s = 2.0 * slant_ref_m / C;
+    const Scalar range_bin_m = system.range_bin_size_m;
+    const Scalar tx_power_w = math::clamp_positive_eps(system.peak_power_w);
+    const Scalar lambda_m = math::clamp_positive_eps(system.wavelength_m);
+    const Scalar system_loss_linear = math::clamp_positive_eps(system.system_loss_linear);
+    const std::size_t num_pulses = static_cast<std::size_t>(system.pulses_per_cpi);
+    const std::size_t num_samples = static_cast<std::size_t>(system.samples_per_pulse);
+
+    ComplexVec pool_sequence;
+    if (cfg.sequence_mode == SeaClutterSequenceMode::SequencePoolMode) {
+        const std::size_t pool_length = static_cast<std::size_t>(cfg.pool_length_factor) * num_pulses;
+        pool_sequence = generate_sequence_pool_ref(pool_length,
+                                                   cfg.seed,
+                                                   system.prf_hz,
+                                                   cfg.doppler_center_hz,
+                                                   cfg.doppler_sigma_hz,
+                                                   cfg.k_shape_nu);
+    }
+
+    for (std::size_t sample_idx = 0; sample_idx < num_samples; ++sample_idx) {
+        const Scalar tau_s = tau_ref_s + static_cast<Scalar>(sample_idx) / system.fs_hz;
+        const Scalar slant_range_m = tau_s * C * 0.5;
+        if (slant_range_m < range_min_m || slant_range_m > range_max_m) {
+            continue;
+        }
+
+        const Scalar ground_range_m = std::sqrt(slant_range_m * slant_range_m -
+                                                antenna_height_m * antenna_height_m);
+        const Scalar grazing_rad = std::atan2(antenna_height_m,
+                                              math::clamp_positive_eps(ground_range_m));
+        const Scalar elevation_deg = -math::rad_to_deg(grazing_rad);
+        const Scalar gain_linear = antenna.gain(beam_pointing.azimuth_deg,
+                                                elevation_deg,
+                                                beam_pointing.azimuth_deg,
+                                                beam_pointing.elevation_deg);
+        const Scalar d_az_rad = math::deg_to_rad(antenna.beamwidth_3db_az_deg());
+        const Scalar cell_area_m2 =
+            math::clamp_nonnegative(ground_range_m) *
+            math::clamp_positive_eps(range_bin_m) * d_az_rad;
+        const Scalar sigma0_linear =
+            morchin_sigma0_linear_ref(cfg, grazing_rad, system.fc_hz);
+        const Scalar sigma_cell = sigma0_linear * cell_area_m2;
+        const Scalar numerator =
+            tx_power_w * gain_linear * gain_linear * lambda_m * lambda_m * sigma_cell;
+        const Scalar denominator =
+            four_pi_cubed * std::pow(math::clamp_positive_eps(slant_range_m), 4.0) *
+            system_loss_linear;
+        const Scalar receive_power_w =
+            math::clamp_nonnegative(math::safe_div(numerator, denominator));
+        const Scalar amplitude = std::sqrt(receive_power_w);
+        if (amplitude <= 0.0) {
+            continue;
+        }
+
+        ComplexVec sample_sequence;
+        if (cfg.sequence_mode == SeaClutterSequenceMode::InTimeMode) {
+            sample_sequence = generate_sequence_ref(num_pulses,
+                                                    cfg.seed,
+                                                    beam_index,
+                                                    static_cast<int>(sample_idx),
+                                                    0,
+                                                    system.prf_hz,
+                                                    cfg.doppler_center_hz,
+                                                    cfg.doppler_sigma_hz,
+                                                    cfg.k_shape_nu);
+        } else {
+            sample_sequence = extract_from_pool_ref(pool_sequence,
+                                                    cfg.seed,
+                                                    beam_index,
+                                                    static_cast<int>(sample_idx),
+                                                    0,
+                                                    num_pulses);
+        }
+
+        for (std::size_t pulse_idx = 0; pulse_idx < num_pulses; ++pulse_idx) {
+            const Complex coeff = amplitude * sample_sequence[pulse_idx];
+            auto& pulse = out_clutter.pulses[pulse_idx];
+            for (std::size_t sample_offset = 0; sample_offset < tx_waveform.size(); ++sample_offset) {
+                const int output_index =
+                    static_cast<int>(sample_idx) + static_cast<int>(sample_offset);
+                if (output_index < 0 || output_index >= system.samples_per_pulse) {
+                    continue;
+                }
+                pulse[static_cast<std::size_t>(output_index)] += coeff * tx_waveform[sample_offset];
+            }
+        }
+    }
+
+    return out_clutter;
+}
+
+Scalar max_echo_difference(const CpiEcho& lhs, const CpiEcho& rhs) {
+    Scalar max_diff = 0.0;
+    const std::size_t num_pulses = std::min(lhs.pulses.size(), rhs.pulses.size());
+    for (std::size_t pulse_idx = 0; pulse_idx < num_pulses; ++pulse_idx) {
+        const std::size_t num_samples =
+            std::min(lhs.pulses[pulse_idx].size(), rhs.pulses[pulse_idx].size());
+        for (std::size_t sample_idx = 0; sample_idx < num_samples; ++sample_idx) {
+            max_diff = std::max(max_diff,
+                                std::abs(lhs.pulses[pulse_idx][sample_idx] -
+                                         rhs.pulses[pulse_idx][sample_idx]));
+        }
+    }
+    return max_diff;
 }
 
 }  // namespace
@@ -128,6 +611,32 @@ void test_radar_system_params() {
     invalid_params.bw_hz = 10e6;  // 10 MHz 带宽
     valid = invalid_params.validate(error);
     assert_true(!valid, "fs < bw rejected", error);
+}
+
+// ============================================================================
+// RadarConfig Tests
+// ============================================================================
+void test_radar_config() {
+    std::cout << "\n=== RadarConfig Tests ===" << std::endl;
+
+    {
+        radar::RadarConfig cfg;
+        cfg.simulation.scan_count = 3;
+
+        std::string error;
+        bool valid = cfg.validate(error);
+        assert_true(valid, "RadarConfig validates positive scan_count");
+    }
+
+    {
+        radar::RadarConfig cfg;
+        cfg.simulation.scan_count = 0;
+
+        std::string error;
+        bool valid = cfg.validate(error);
+        assert_true(!valid && error.find("simulation.scan_count") != std::string::npos,
+                    "RadarConfig rejects non-positive scan_count", error);
+    }
 }
 
 // ============================================================================
@@ -525,6 +1034,64 @@ void test_sea_clutter() {
         assert_true(err.empty() || model.params().k_shape_nu > 0, "SeaClutter params valid");
     }
 
+    // --- 论文式 Morchin 趋势验证 ---
+    {
+        radar::clutter::SeaClutterConfig morchin_cfg = cfg;
+        const Scalar fc_hz = 20.0e9;
+
+        morchin_cfg.morchin_sea_state = 3.0;
+        const Scalar sigma_1deg =
+            morchin_sigma0_linear_ref(morchin_cfg, math::deg_to_rad(1.0), fc_hz);
+        const Scalar sigma_5deg =
+            morchin_sigma0_linear_ref(morchin_cfg, math::deg_to_rad(5.0), fc_hz);
+        const Scalar sigma_20deg =
+            morchin_sigma0_linear_ref(morchin_cfg, math::deg_to_rad(20.0), fc_hz);
+        const Scalar sigma_60deg =
+            morchin_sigma0_linear_ref(morchin_cfg, math::deg_to_rad(60.0), fc_hz);
+        const Scalar sigma_80deg =
+            morchin_sigma0_linear_ref(morchin_cfg, math::deg_to_rad(80.0), fc_hz);
+        const Scalar sigma_89deg =
+            morchin_sigma0_linear_ref(morchin_cfg, math::deg_to_rad(89.0), fc_hz);
+
+        assert_true(sigma_5deg > sigma_1deg &&
+                    sigma_20deg > sigma_5deg &&
+                    sigma_60deg > sigma_20deg &&
+                    sigma_80deg > sigma_60deg &&
+                    sigma_89deg > sigma_80deg,
+                    "Morchin paper trend vs grazing angle",
+                    "ss=3, sigma(1,5,20,60,80,89 deg) increases");
+
+        radar::clutter::SeaClutterConfig ss1_cfg = cfg;
+        radar::clutter::SeaClutterConfig ss4_cfg = cfg;
+        ss1_cfg.morchin_sea_state = 1.0;
+        ss4_cfg.morchin_sea_state = 4.0;
+        const Scalar sigma_ss1_20deg =
+            morchin_sigma0_linear_ref(ss1_cfg, math::deg_to_rad(20.0), fc_hz);
+        const Scalar sigma_ss4_20deg =
+            morchin_sigma0_linear_ref(ss4_cfg, math::deg_to_rad(20.0), fc_hz);
+        assert_true(sigma_ss4_20deg > sigma_ss1_20deg,
+                    "Morchin paper sea-state layering at low grazing",
+                    "sigma_ss4_20deg=" + std::to_string(sigma_ss4_20deg) +
+                    ", sigma_ss1_20deg=" + std::to_string(sigma_ss1_20deg));
+
+        const Scalar phi_c =
+            morchin_critical_angle_ref(3.0, fc_hz);
+        const Scalar sigma_below =
+            morchin_sigma0_linear_ref(morchin_cfg, 0.5 * phi_c, fc_hz);
+        const Scalar sigma_at =
+            morchin_sigma0_linear_ref(morchin_cfg, phi_c, fc_hz);
+        const Scalar sigma_above =
+            morchin_sigma0_linear_ref(morchin_cfg, 1.5 * phi_c, fc_hz);
+        assert_true(std::isfinite(sigma_below) &&
+                    std::isfinite(sigma_at) &&
+                    std::isfinite(sigma_above) &&
+                    sigma_below > 0.0 &&
+                    sigma_at > 0.0 &&
+                    sigma_above > 0.0,
+                    "Morchin paper critical-angle continuity",
+                    "phi_c_deg=" + std::to_string(math::rad_to_deg(phi_c)));
+    }
+
     // --- 单层单元功率验证 ---
     {
         radar::clutter::SeaClutterModel model(cfg);
@@ -550,6 +1117,129 @@ void test_sea_clutter() {
         bool generated = model.generate_cpi(sys, antenna, beam, 0, tx_waveform, clutter);
         assert_true(generated, "SeaClutter generate_cpi",
                     generated ? "success" : model.last_error());
+    }
+
+    // --- PhysicalGrid 严格等价重构验证 ---
+    {
+        radar::RadarSystemParams ref_sys;
+        ref_sys.pulses_per_cpi = 8;
+        ref_sys.min_range_m = 1000.0;
+        ref_sys.max_range_m = 1500.0;
+        ref_sys.compute_derived_params();
+
+        radar::antenna::AntennaConfig ant_cfg;
+        ant_cfg.model_type = radar::PhasedArrayModelType::UPA_2D;
+        ant_cfg.num_elements_az = 16;
+        ant_cfg.num_elements_el = 8;
+        ant_cfg.peak_gain_db = 30.0;
+
+        radar::antenna::AntennaModel antenna;
+        antenna.set_config(ant_cfg);
+        antenna.initialize();
+
+        radar::BeamPoint beam;
+        beam.azimuth_deg = 0.0;
+        beam.elevation_deg = 0.0;
+
+        radar::ComplexVec tx_waveform(900, radar::Complex(0.0, 0.0));
+        for (std::size_t i = 0; i < tx_waveform.size(); ++i) {
+            const Scalar phase = 0.013 * static_cast<Scalar>(i);
+            tx_waveform[i] = Complex(std::cos(phase), std::sin(phase));
+        }
+
+        auto run_equivalence_case = [&](radar::SeaClutterSequenceMode sequence_mode,
+                                        const std::string& test_name) {
+            radar::clutter::SeaClutterConfig ref_cfg = cfg;
+            ref_cfg.grid_mode = radar::SeaClutterGridMode::PhysicalGrid;
+            ref_cfg.sequence_mode = sequence_mode;
+            ref_cfg.ground_range_min_m = ref_sys.min_range_m;
+            ref_cfg.ground_range_max_m = ref_sys.max_range_m;
+            ref_cfg.az_grid_step_deg = 1.0;
+            ref_cfg.pool_length_factor = 4;
+            ref_cfg.seed = 424242;
+
+            radar::clutter::SeaClutterModel model(ref_cfg);
+            radar::CpiEcho optimized;
+            const bool generated =
+                model.generate_cpi(ref_sys, antenna, beam, 2, tx_waveform, optimized);
+            assert_true(generated, test_name + " generate_cpi",
+                        generated ? "success" : model.last_error());
+            if (!generated) {
+                return;
+            }
+
+            const radar::CpiEcho reference = generate_physical_grid_reference(
+                ref_sys, ref_cfg, antenna, beam, 2, tx_waveform);
+            const Scalar max_diff = max_echo_difference(optimized, reference);
+            assert_true(max_diff <= 1e-9, test_name,
+                        "max_diff=" + std::to_string(max_diff));
+        };
+
+        run_equivalence_case(radar::SeaClutterSequenceMode::InTimeMode,
+                             "PhysicalGrid refactor equivalence (InTime)");
+        run_equivalence_case(radar::SeaClutterSequenceMode::SequencePoolMode,
+                             "PhysicalGrid refactor equivalence (Pool)");
+    }
+
+    // --- RangeSampleGrid 建模验证 ---
+    {
+        radar::RadarSystemParams ref_sys;
+        ref_sys.pulses_per_cpi = 8;
+        ref_sys.min_range_m = 1000.0;
+        ref_sys.max_range_m = 1400.0;
+        ref_sys.compute_derived_params();
+
+        radar::antenna::AntennaConfig ant_cfg;
+        ant_cfg.model_type = radar::PhasedArrayModelType::UPA_2D;
+        ant_cfg.num_elements_az = 16;
+        ant_cfg.num_elements_el = 8;
+        ant_cfg.peak_gain_db = 30.0;
+
+        radar::antenna::AntennaModel antenna;
+        antenna.set_config(ant_cfg);
+        antenna.initialize();
+
+        radar::BeamPoint beam;
+        beam.azimuth_deg = 0.0;
+        beam.elevation_deg = 0.0;
+
+        radar::ComplexVec tx_waveform(600, radar::Complex(0.0, 0.0));
+        for (std::size_t i = 0; i < tx_waveform.size(); ++i) {
+            const Scalar phase = 0.009 * static_cast<Scalar>(i);
+            tx_waveform[i] = Complex(std::cos(phase), -std::sin(phase));
+        }
+
+        auto run_range_sample_case = [&](radar::SeaClutterSequenceMode sequence_mode,
+                                         const std::string& test_name) {
+            radar::clutter::SeaClutterConfig ref_cfg = cfg;
+            ref_cfg.grid_mode = radar::SeaClutterGridMode::RangeSampleGrid;
+            ref_cfg.sequence_mode = sequence_mode;
+            ref_cfg.ground_range_min_m = ref_sys.min_range_m;
+            ref_cfg.ground_range_max_m = ref_sys.max_range_m;
+            ref_cfg.seed = 24680;
+            ref_cfg.pool_length_factor = 4;
+
+            radar::clutter::SeaClutterModel model(ref_cfg);
+            radar::CpiEcho optimized;
+            const bool generated =
+                model.generate_cpi(ref_sys, antenna, beam, 1, tx_waveform, optimized);
+            assert_true(generated, test_name + " generate_cpi",
+                        generated ? "success" : model.last_error());
+            if (!generated) {
+                return;
+            }
+
+            const radar::CpiEcho reference = generate_range_sample_grid_reference(
+                ref_sys, ref_cfg, antenna, beam, 1, tx_waveform);
+            const Scalar max_diff = max_echo_difference(optimized, reference);
+            assert_true(max_diff <= 1e-9, test_name,
+                        "max_diff=" + std::to_string(max_diff));
+        };
+
+        run_range_sample_case(radar::SeaClutterSequenceMode::InTimeMode,
+                              "RangeSampleGrid equivalence (InTime)");
+        run_range_sample_case(radar::SeaClutterSequenceMode::SequencePoolMode,
+                              "RangeSampleGrid equivalence (Pool)");
     }
 
     // --- K 分布拖尾特性 ---
@@ -1014,6 +1704,7 @@ int main() {
     // 运行所有测试
     test_math_utils();
     test_radar_system_params();
+    test_radar_config();
     test_waveform_generator();
     test_noise_engine();
     test_sea_clutter();

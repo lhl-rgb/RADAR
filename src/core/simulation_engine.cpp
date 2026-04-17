@@ -153,9 +153,8 @@ bool SimulationEngine::initialize_engines() {
     }
 
     // 计算总扫描数和总 CPI 数
-    const int scans = 2;  // 扫描两圈
-    total_scan_count_ = scans;
-    total_cpi_count_ = beam_count_ * scans;
+    total_scan_count_ = config_.simulation.scan_count;
+    total_cpi_count_ = beam_count_ * total_scan_count_;
 
     SPDLOG_INFO("[SimulationEngine] Initialized");
     SPDLOG_INFO("  Beams per scan: {}", beam_count_);
