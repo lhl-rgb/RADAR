@@ -23,6 +23,12 @@ namespace radar {
 // - ExportConfig: data_exporter.h
 
 void from_json(const nlohmann::json& j, RadarConfig& cfg) {
+    if (j.contains("simulation")) {
+        j.at("simulation").get_to(cfg.simulation);
+    } else if (j.contains("scan_count")) {
+        j.at("scan_count").get_to(cfg.simulation.scan_count);
+    }
+
     // System parameters - use unified serializer
     if (j.contains("system")) {
         j.at("system").get_to(cfg.system);
@@ -69,6 +75,27 @@ void from_json(const nlohmann::json& j, RadarConfig& cfg) {
     cfg.compute_derived_params();
 }
 
+void to_json(nlohmann::json& j, const RadarConfig& cfg) {
+    j["simulation"] = cfg.simulation;
+    j["system"] = cfg.system;
+    j["waveform"] = cfg.waveform;
+    j["antenna"] = cfg.antenna;
+    j["beam_table"] = cfg.beam_table;
+    j["noise"] = cfg.noise;
+    j["clutter"] = cfg.clutter;
+    j["target"] = cfg.target;
+    j["data_export"] = cfg.data_export;
+    j["udp_output"] = cfg.udp_output;
+
+    // Initial targets
+    j["initial_targets"] = nlohmann::json::array();
+    for (const auto& target : cfg.initial_targets) {
+        nlohmann::json t;
+        to_json(t, target);
+        j["initial_targets"].push_back(t);
+    }
+}
+
 bool ConfigurationManager::load_from_json(const std::string& filepath) {
     try {
         std::ifstream ifs(filepath);
@@ -102,25 +129,7 @@ bool ConfigurationManager::load_from_json(const std::string& filepath) {
 bool ConfigurationManager::save_to_json(const std::string& filepath) const {
     try {
         nlohmann::json j;
-
-        // Use unified to_json serializers
-        j["system"] = config_.system;
-        j["waveform"] = config_.waveform;
-        j["antenna"] = config_.antenna;
-        j["beam_table"] = config_.beam_table;
-        j["noise"] = config_.noise;
-        j["clutter"] = config_.clutter;
-        j["target"] = config_.target;
-        j["data_export"] = config_.data_export;
-        j["udp_output"] = config_.udp_output;
-
-        // Initial targets
-        j["initial_targets"] = nlohmann::json::array();
-        for (const auto& target : config_.initial_targets) {
-            nlohmann::json t;
-            to_json(t, target);
-            j["initial_targets"].push_back(t);
-        }
+        to_json(j, config_);
 
         std::ofstream ofs(filepath);
         if (!ofs.is_open()) {

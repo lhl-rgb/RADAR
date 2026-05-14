@@ -63,6 +63,7 @@ private:
     std::mutex mutex_;
     ::radar::RadarConfig current_config_;  // C++ struct
     std::unique_ptr<SimulationEngine> engine_;
+    bool started_ = false;  ///< true after StartSimulation called
 };
 
 /// Helper: start a gRPC server on a given address.

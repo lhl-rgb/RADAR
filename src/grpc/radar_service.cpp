@@ -36,6 +36,7 @@ grpc::Status RadarServiceImpl::SetConfig(
         }
 
         current_config_ = new_config;
+        started_ = false;
 
         engine_ = std::make_unique<SimulationEngine>(current_config_);
         if (!engine_->initialize()) {
@@ -66,22 +67,7 @@ grpc::Status RadarServiceImpl::GetConfig(
     std::lock_guard<std::mutex> lock(mutex_);
 
     nlohmann::json j;
-    j["simulation"] = current_config_.simulation;
-    j["system"] = current_config_.system;
-    j["waveform"] = current_config_.waveform;
-    j["antenna"] = current_config_.antenna;
-    j["beam_table"] = current_config_.beam_table;
-    j["noise"] = current_config_.noise;
-    j["clutter"] = current_config_.clutter;
-    j["target"] = current_config_.target;
-    j["data_export"] = current_config_.data_export;
-    j["udp_output"] = current_config_.udp_output;
-    j["initial_targets"] = nlohmann::json::array();
-    for (const auto& t : current_config_.initial_targets) {
-        nlohmann::json tj;
-        to_json(tj, t);
-        j["initial_targets"].push_back(tj);
-    }
+    to_json(j, current_config_);
 
     reply->set_json_content(j.dump(2));
     return grpc::Status::OK;
@@ -133,6 +119,7 @@ grpc::Status RadarServiceImpl::StartSimulation(
         return grpc::Status::OK;
     }
 
+    started_ = true;
     engine_->run_async(0);
     SPDLOG_INFO("gRPC: simulation started");
     reply->set_success(true);
@@ -181,8 +168,10 @@ grpc::Status RadarServiceImpl::GetStatus(
         reply->set_state(SimStatus::RUNNING);
     } else if (engine_->stop_requested()) {
         reply->set_state(SimStatus::STOPPED);
-    } else {
+    } else if (started_) {
         reply->set_state(SimStatus::FINISHED);
+    } else {
+        reply->set_state(SimStatus::IDLE);
     }
 
     reply->set_progress(engine_->progress_percent() / 100.0);
