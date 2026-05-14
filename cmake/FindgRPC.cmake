@@ -82,7 +82,7 @@ find_package_handle_standard_args(gRPC
         gRPC_INCLUDE_DIR
         gRPC_GRPC++_LIBRARY
         gRPC_GRPC_LIBRARY
-    VERSION_VAR gRPC_VERSION
+        gRPC_CPP_PLUGIN
 )
 
 # Create imported targets
@@ -91,6 +91,7 @@ if(gRPC_FOUND AND NOT TARGET gRPC::grpc++)
     set_target_properties(gRPC::grpc++ PROPERTIES
         IMPORTED_LOCATION "${gRPC_GRPC++_LIBRARY}"
         INTERFACE_INCLUDE_DIRECTORIES "${gRPC_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "protobuf::libprotobuf"
     )
 endif()
 

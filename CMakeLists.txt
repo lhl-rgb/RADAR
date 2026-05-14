@@ -267,9 +267,8 @@ endif()
 # gRPC service library
 # ============================================================
 set(RADAR_PROTO "${CMAKE_CURRENT_SOURCE_DIR}/include/grpc/radar_service.proto")
-set(RADAR_PROTO_BUILD "${CMAKE_BINARY_DIR}/grpc")
 
-file(MAKE_DIRECTORY "${RADAR_PROTO_BUILD}")
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/grpc")
 
 protobuf_generate(
     PROTOS ${RADAR_PROTO}
