@@ -53,6 +53,22 @@ find_package(Eigen3 REQUIRED NO_MODULE)
 find_package(nlohmann_json REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GDAL REQUIRED)
+
+# ============================================================
+# gRPC + Protobuf
+# ============================================================
+find_package(Protobuf REQUIRED)
+find_package(gRPC REQUIRED)
+
+# ============================================================
+# Qt (GUI only, optional when building standalone server)
+# ============================================================
+find_package(QT NAMES Qt6 Qt5 QUIET COMPONENTS Widgets)
+if(QT_FOUND)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
+    set(RADAR_QT_FOUND ON)
+endif()
+
 find_package(FFTW3 QUIET)
 
 if(TARGET FFTW3::fftw3)
@@ -245,4 +261,58 @@ if(RADAR_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test")
     enable_testing()
     add_test(NAME radar_tests COMMAND radar_tests)
   endif()
+endif()
+
+# ============================================================
+# gRPC service library
+# ============================================================
+set(RADAR_PROTO "${CMAKE_CURRENT_SOURCE_DIR}/include/grpc/radar_service.proto")
+set(RADAR_PROTO_BUILD "${CMAKE_BINARY_DIR}/grpc")
+
+file(MAKE_DIRECTORY "${RADAR_PROTO_BUILD}")
+
+protobuf_generate(
+    PROTOS ${RADAR_PROTO}
+    OUT_VAR _proto_srcs
+)
+protobuf_generate(
+    PROTOS ${RADAR_PROTO}
+    LANGUAGE grpc
+    OUT_VAR _grpc_srcs
+    PLUGIN protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
+    GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
+)
+
+add_library(radar_grpc_service STATIC
+    src/grpc/radar_service.cpp
+    ${_proto_srcs}
+    ${_grpc_srcs}
+)
+target_include_directories(radar_grpc_service
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${CMAKE_BINARY_DIR}"
+)
+target_link_libraries(radar_grpc_service
+    PUBLIC
+        radar::modules
+        gRPC::grpc++
+        protobuf::libprotobuf
+)
+
+# ============================================================
+# Standalone gRPC server (headless, remote mode)
+# ============================================================
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/radar_server.cpp")
+    add_executable(radar_server app/radar_server.cpp)
+    target_link_libraries(radar_server PRIVATE radar_grpc_service radar::modules gRPC::grpc++)
+endif()
+
+# ============================================================
+# Qt GUI application (with embedded gRPC server)
+# ============================================================
+if(RADAR_QT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/app/radar_qt.cpp")
+    add_executable(radar_qt app/radar_qt.cpp)
+    target_link_libraries(radar_qt PRIVATE radar_grpc_service radar::modules
+                          gRPC::grpc++ Qt${QT_VERSION_MAJOR}::Widgets)
 endif()
