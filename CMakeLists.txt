@@ -290,6 +290,7 @@ add_library(radar_grpc_service STATIC
 target_include_directories(radar_grpc_service
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${CMAKE_BINARY_DIR}/include"
         "${CMAKE_BINARY_DIR}"
 )
 target_link_libraries(radar_grpc_service

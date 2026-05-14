@@ -24,6 +24,39 @@
 
 namespace radar {
 
+/**
+ * @brief 仿真流程控制配置
+ * @details 这些参数控制仿真运行流程，不属于雷达物理系统参数。
+ */
+struct SimulationConfig {
+    int scan_count = 2; ///< 仿真扫描圈数。
+
+    bool validate(std::string& error) const {
+        if (scan_count <= 0) {
+            error = "simulation.scan_count must be positive";
+            return false;
+        }
+        return true;
+    }
+
+    void print() const {
+        SPDLOG_INFO("--- SimulationConfig ---");
+        SPDLOG_INFO("  scan_count: {}", scan_count);
+    }
+};
+
+inline void from_json(const nlohmann::json& j, SimulationConfig& cfg) {
+    if (j.contains("scan_count")) {
+        j.at("scan_count").get_to(cfg.scan_count);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const SimulationConfig& cfg) {
+    j = nlohmann::json{
+        {"scan_count", cfg.scan_count}
+    };
+}
+
 
 
 /**
@@ -33,6 +66,7 @@ namespace radar {
  * 服务器端模式：所有配置通过 JSON 文件加载，不在此代码中硬编码。
  */
 struct RadarConfig {
+    SimulationConfig simulation;        ///< 仿真流程控制配置
     RadarSystemParams system;          ///< 全局共享参数
     waveform::WaveformConfig waveform; ///< 波形配置
     antenna::AntennaConfig antenna;    ///< 天线配置（只含物理配置）
@@ -78,6 +112,10 @@ struct RadarConfig {
     void print() const;
 };
 
+// JSON serialization declarations (implemented in configuration_manager.cpp)
+void from_json(const nlohmann::json& j, RadarConfig& cfg);
+void to_json(nlohmann::json& j, const RadarConfig& cfg);
+
 inline RadarConfig::RadarConfig() {
     compute_derived_params();
 }
@@ -88,6 +126,9 @@ inline void RadarConfig::compute_derived_params() {
 
 inline bool RadarConfig::validate(std::string& error) const {
     // Validate each module config
+    if (!simulation.validate(error)) {
+        return false;
+    }
     if (!system.validate(error)) {
         return false;
     }
@@ -163,6 +204,8 @@ inline void RadarConfig::sync_udp_config() {
 
 inline void RadarConfig::print() const {
     SPDLOG_INFO("=== Radar Simulation Config ===");
+    SPDLOG_INFO("");
+    simulation.print();
     SPDLOG_INFO("");
     system.print();
     SPDLOG_INFO("");
