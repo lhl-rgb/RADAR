@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Radar 项目构建脚本
-# 支持两种编译模式：
-#   --main      只编译主程序 (radar_app + matlab_export_tool)
-#   --validate  只编译验证程序 (waveform_validation, antenna_validation, noise_validation, clutter_validation)
+# 编译模式：
 #   --all       编译全部 (默认)
+#   --qt        只编译 Qt GUI 客户端 (radar_client)
+#   --server    只编译独立 gRPC server (radar_server)
 #   --clean     清理构建目录
 
 set -e
@@ -19,12 +19,12 @@ BUILD_MODE="all"
 # 解析参数
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --main)
-            BUILD_MODE="main"
+        --qt)
+            BUILD_MODE="qt"
             shift
             ;;
-        --validate)
-            BUILD_MODE="validate"
+        --server)
+            BUILD_MODE="server"
             shift
             ;;
         --all)
@@ -46,9 +46,9 @@ while [[ $# -gt 0 ]]; do
             echo "用法: $0 [选项]"
             echo ""
             echo "编译模式 (默认：--all):"
-            echo "  --main       只编译主程序 (radar, matlab_export_tool)"
-            echo "  --validate   只编译验证程序 (waveform_validation, antenna_validation, noise_validation, clutter_validation)"
             echo "  --all        编译全部目标"
+            echo "  --qt         只编译 Qt GUI 客户端 (radar_client)"
+            echo "  --server     只编译独立 gRPC server (radar_server)"
             echo ""
             echo "其他选项:"
             echo "  --clean      清理构建目录和输出"
@@ -77,13 +77,13 @@ CMAKE_OPTS="-B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
 
 # 根据模式设置 CMake 缓存变量
 case $BUILD_MODE in
-    main)
-        CMAKE_OPTS="${CMAKE_OPTS} -DRADAR_BUILD_MAIN_ONLY=ON"
-        echo "→ 编译主程序..."
+    qt)
+        CMAKE_OPTS="${CMAKE_OPTS} -DRADAR_BUILD_CLIENT=ON -DRADAR_BUILD_SERVER=OFF -DRADAR_BUILD_TESTS=OFF"
+        echo "→ 编译 Qt GUI 客户端..."
         ;;
-    validate)
-        CMAKE_OPTS="${CMAKE_OPTS} -DRADAR_BUILD_VALIDATE_ONLY=ON"
-        echo "→ 编译验证程序..."
+    server)
+        CMAKE_OPTS="${CMAKE_OPTS} -DRADAR_BUILD_CLIENT=OFF -DRADAR_BUILD_SERVER=ON -DRADAR_BUILD_TESTS=OFF"
+        echo "→ 编译 gRPC Server..."
         ;;
     all)
         echo "→ 编译全部目标..."

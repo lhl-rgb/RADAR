@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 OUT_DIR="$SCRIPT_DIR/out"
-BUILD_DIR="$OUT_DIR/build"
+BUILD_DIR="$SCRIPT_DIR/build"
 BIN_DIR="$OUT_DIR/bin"
 
 show_help() {
@@ -15,9 +15,8 @@ show_help() {
     echo ""
     echo "选项:"
     echo "  -h, --help          显示帮助信息"
-    echo "  -r, --run           构建后直接运行主程序(跳过菜单)"
+    echo "  -s, --server        构建后直接运行 gRPC 服务端(跳过菜单)"
     echo "  -t, --test          构建后直接运行测试(跳过菜单)"
-    echo "  -m, --matlab        构建后直接运行MATLAB工具(跳过菜单)"
     echo ""
     exit 0
 }
@@ -31,19 +30,14 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             show_help
             ;;
-        -r|--run)
+        -s|--server)
             SKIP_MENU=true
-            RUN_TARGET="radar"
+            RUN_TARGET="radar_server"
             shift
             ;;
         -t|--test)
             SKIP_MENU=true
             RUN_TARGET="radar_tests"
-            shift
-            ;;
-        -m|--matlab)
-            SKIP_MENU=true
-            RUN_TARGET="matlab_export_tool"
             shift
             ;;
         *)
@@ -102,24 +96,24 @@ fi
 while true; do
     echo ""
     echo "===== 请选择要运行的程序 ====="
-    echo "  1) 主程序 (radar)"
-    echo "  2) 测试 (radar_tests)"
-    echo "  3) MATLAB 导出工具 (matlab_export_tool)"
+    echo "  1) gRPC 服务端 (radar_server)"
+    echo "  2) Qt 客户端 (radar_client)"
+    echo "  3) 测试 (radar_tests)"
     echo "  0) 退出"
     echo "================================"
     read -p "请输入选项 [0-3]: " choice
 
     case $choice in
         1)
-            run_program "radar"
+            run_program "radar_server"
             break
             ;;
         2)
-            run_program "radar_tests"
+            run_program "radar_client"
             break
             ;;
         3)
-            run_program "matlab_export_tool"
+            run_program "radar_tests"
             break
             ;;
         0)

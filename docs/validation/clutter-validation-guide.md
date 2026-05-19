@@ -21,18 +21,39 @@
 
 ### 2.1 Morchin 海杂波模型
 
-海杂波的归一化雷达散射截面积（σ⁰）使用 Morchin 经验模型计算：
+海杂波的归一化雷达散射截面积（σ⁰）使用论文式 Morchin 模型计算：
 
-$$\sigma^0_{\text{dB}} = a_0 + a_g \log_{10}(\sin\psi) + a_f \log_{10}(f_{\text{GHz}}) + a_s \cdot \text{sea\_state}$$
+$$
+\sigma_0=
+\frac{4\times10^{-7}\cdot 10^{0.6(ss+1)}\cdot \sigma_0^c\cdot \sin\varphi}{\lambda}
+\;+\;
+\cot^2 \beta \cdot \exp\left(-\frac{\tan^2(\pi/2-\varphi)}{\tan^2\beta}\right)
+$$
 
 其中：
-- $a_0 = -40$ dB（基础项系数）
-- $a_g = 10$（掠射角项系数）
-- $a_f = 0$（载频项系数）
-- $a_s = 1$（海况项系数）
-- $\psi$ 为掠射角（弧度）
-- $f_{\text{GHz}}$ 为载频（GHz）
-- $\text{sea\_state} = 3$（海况等级）
+
+$$
+\beta=\frac{2.44(ss+1)^{1.08}}{57.29},\qquad
+h_e=0.025+0.046ss^{1.72},\qquad
+\varphi_c=\arcsin\left(\frac{\lambda}{4\pi h_e}\right)
+$$
+
+$$
+\sigma_0^c=
+\begin{cases}
+(\varphi/\varphi_c)^{1.9}, & \varphi<\varphi_c \\
+1, & \varphi\ge \varphi_c
+\end{cases}
+$$
+
+其中：
+- $\varphi$ 为掠射角（弧度）
+- $\lambda$ 为雷达波长
+- $ss$ 为海情等级
+- $\beta$ 为经验常数
+- $h_e$ 为海面粗糙度高度（m）
+- $\varphi_c$ 为临界角
+- $\sigma_0^c$ 为论文中的分段理论参数
 
 ### 2.2 K 分布模型
 
@@ -188,7 +209,7 @@ MATLAB 脚本将：
 
 | 文件名 | 内容 | 用途 |
 |--------|------|------|
-| morchin_sigma0.csv | σ⁰ vs 掠射角 | 验证经验模型 |
+| morchin_sigma0.csv | σ⁰ vs 掠射角 | 验证论文式 Morchin 模型 |
 | k_distribution_samples.csv | K 分布样本 | 验证统计特性 |
 | doppler_spectrum.csv | 多普勒谱数据 | 验证频谱特性 |
 | sigma0_comparison.csv | σ⁰对比结果 | MATLAB 生成 |

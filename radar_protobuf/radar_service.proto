@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package radar;
+
+service RadarService {
+    rpc SetSystemParams(SystemParams) returns (Status);
+    rpc GetSystemParams(Empty) returns (SystemParams);
+
+    rpc SetWaveformParams(WaveformParams) returns (Status);
+    rpc GetWaveformParams(Empty) returns (WaveformParams);
+
+    rpc SetAntennaParams(AntennaParams) returns (Status);
+    rpc GetAntennaParams(Empty) returns (AntennaParams);
+
+    rpc SetNoiseParams(NoiseParams) returns (Status);
+    rpc GetNoiseParams(Empty) returns (NoiseParams);
+
+    rpc SetClutterParams(ClutterParams) returns (Status);
+    rpc GetClutterParams(Empty) returns (ClutterParams);
+
+    rpc AddTarget(TargetParams) returns (Status);
+    rpc RemoveTarget(IntValue) returns (Status);
+    rpc ClearTargets(Empty) returns (Status);
+    rpc GetTargets(Empty) returns (TargetListResponse);
+
+    rpc ValidateAll(Empty) returns (ValidationResult);
+    rpc StartSimulation(Empty) returns (Status);
+    rpc StopSimulation(Empty) returns (Status);
+    rpc GetStatus(Empty) returns (SimStatus);
+}
+
+message Empty {}
+
+message IntValue {
+    int32 value = 1;
+}
+
+message Status {
+    bool success = 1;
+    string message = 2;
+}
+
+message ValidationResult {
+    bool valid = 1;
+    repeated string errors = 2;
+}
+
+message SimStatus {
+    enum State {
+        IDLE = 0;
+        RUNNING = 1;
+        STOPPED = 2;
+        FINISHED = 3;
+    }
+    State state = 1;
+    double progress = 2;
+    int32 current_scan = 3;
+    int32 total_scans = 4;
+}
+
+message SystemParams {
+    double fc_hz = 1;
+    double prf_hz = 2;
+    double bandwidth_hz = 3;
+    double pulse_width_s = 4;
+    double fs_hz = 5;
+    double min_range_m = 6;
+    double max_range_m = 7;
+    int32 scan_count = 8;
+}
+
+message WaveformParams {
+    enum WaveformType {
+        LFM = 0;
+        PHASE_CODE = 1;
+        NLFM = 2;
+        STARE = 3;
+    }
+    WaveformType waveform_type = 1;
+    int32 phase_code_type = 2;
+    int32 nlfm_window_type = 3;
+    int32 polarization = 4;
+}
+
+message AntennaParams {
+    enum AntennaModelType {
+        ISOTROPIC = 0;
+        PARABOLIC = 1;
+        PLANAR_ARRAY = 2;
+        USER_PATTERN = 3;
+    }
+    AntennaModelType model_type = 1;
+    int32 num_elements_az = 2;
+    int32 num_elements_el = 3;
+    double peak_gain_db = 4;
+}
+
+message NoiseParams {
+    enum NoiseMode {
+        DISABLED = 0;
+        COMPLEX_GAUSSIAN = 1;
+        RECEIVER_TEMP = 2;
+        SNR = 3;
+    }
+    NoiseMode mode = 1;
+    double sigma_complex = 2;
+    double temperature_k = 3;
+    double noise_power_w = 4;
+    double noise_bandwidth_hz = 5;
+    int32 seed = 6;
+}
+
+message ClutterParams {
+    bool enabled = 1;
+    double k_shape_nu = 2;
+    double morchin_sea_state = 3;
+    double doppler_center_hz = 4;
+    double doppler_sigma_hz = 5;
+    double ground_range_min_m = 6;
+    double ground_range_max_m = 7;
+    int32 seed = 8;
+}
+
+message TargetParams {
+    int32 id = 1;
+    double range_m = 2;
+    double azimuth_deg = 3;
+    double elevation_deg = 4;
+    double radial_velocity_ms = 5;
+    double rcs_db = 6;
+    int32 swerling_type = 7;
+}
+
+message TargetListResponse {
+    repeated TargetParams targets = 1;
+}
