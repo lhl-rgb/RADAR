@@ -4,11 +4,12 @@
  */
 
 #include "core/tools/data_exporter.h"
-#include <filesystem>
-#include <sstream>
+
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <nlohmann/json.hpp>
+#include <sstream>
 
 namespace radar::core {
 
@@ -46,44 +47,75 @@ bool DataExporter::export_scan(const ScanData& scan_data) {
 
     bool success = true;
 
-    // 导出配置参数（每圈都覆盖写，保证参数文件与本次运行一致）
     if (config_.export_config_params) {
         success &= export_config_params(scan_data.system_params,
                                         scan_data.target_config,
+                                        scan_data.mech_scan_config,
                                         scan_data.initial_targets);
     }
 
-    // 导出 IQ 数据（二进制 dat 格式）
     if (config_.export_raw_echo_iq) {
-        success &= export_echo_iq_dat(scan_data.cpi_echos, scan_data.scan_index);
+        success &= export_echo_iq_dat(scan_data.scan_echo);
+        success &= export_pulse_metadata_csv(scan_data.scan_echo);
     }
 
     return success;
 }
 
 bool DataExporter::export_config_params(const RadarSystemParams& system,
-                                         const target::TargetConfig& target_config,
-                                         const TargetList& initial_targets) {
+                                        const target::TargetConfig& target_config,
+                                        const TargetList& initial_targets) {
+    antenna::MechanicalScanConfig mech_scan_config;
+    mech_scan_config.compute_derived_params(system.pri_s);
+    return export_config_params(system, target_config, mech_scan_config, initial_targets);
+}
+
+bool DataExporter::export_config_params(const RadarSystemParams& system,
+                                        const target::TargetConfig& target_config,
+                                        const antenna::MechanicalScanConfig& mech_scan_config,
+                                        const TargetList& initial_targets) {
     std::string filepath = config_.output_dir + "/config_params.json";
 
     nlohmann::json j;
-
-    // System parameters
     j["system_params"] = {
         {"fc_hz", system.fc_hz},
         {"prf_hz", system.prf_hz},
         {"pri_s", system.pri_s},
         {"bw_hz", system.bw_hz},
         {"pulse_width_s", system.pulse_width_s},
+        {"peak_power_w", system.peak_power_w},
         {"fs_hz", system.fs_hz},
-        {"pulses_per_cpi", system.pulses_per_cpi},
+        {"min_range_m", system.min_range_m},
+        {"max_range_m", system.max_range_m},
+        {"antenna_height_m", system.antenna_height_m},
+        {"noise_figure_db", system.noise_figure_db},
+        {"system_loss_db", system.system_loss_db},
         {"samples_per_pulse", system.samples_per_pulse},
+        {"samples_per_tx", system.samples_per_tx},
         {"wavelength_m", system.wavelength_m},
+        {"range_resolution_m", system.range_resolution_m},
+        {"range_bin_size_m", system.range_bin_size_m},
         {"max_unambiguous_range_m", system.max_unambiguous_range_m},
-        {"range_resolution_m", system.range_resolution_m}
+        {"max_unambiguous_velocity_mps", system.max_unambiguous_velocity_mps},
+        {"max_doppler_hz", system.max_doppler_hz}
     };
 
-    // Target config
+    j["radar_location"] = {
+        {"latitude_deg", system.radar_location.latitude},
+        {"longitude_deg", system.radar_location.longitude},
+        {"altitude_m", system.radar_location.altitude}
+    };
+
+    j["mechanical_scan"] = {
+        {"rotation_rate_dps", mech_scan_config.rotation_rate_dps},
+        {"az_start_deg", mech_scan_config.az_start_deg},
+        {"az_end_deg", mech_scan_config.az_end_deg},
+        {"elevation_deg", mech_scan_config.elevation_deg},
+        {"rotation_period_s", mech_scan_config.rotation_period_s},
+        {"azimuth_step_per_prt_deg", mech_scan_config.azimuth_step_per_prt_deg},
+        {"pulses_per_rotation", mech_scan_config.pulses_per_rotation}
+    };
+
     j["target_config"] = {
         {"enabled", target_config.enabled},
         {"enable_beam_gain", target_config.enable_beam_gain},
@@ -94,7 +126,6 @@ bool DataExporter::export_config_params(const RadarSystemParams& system,
         {"beam_gate_threshold_db", target_config.beam_gate_threshold_db}
     };
 
-    // Initial targets
     j["initial_targets"] = nlohmann::json::array();
     for (const auto& t : initial_targets) {
         nlohmann::json target_json;
@@ -123,9 +154,8 @@ bool DataExporter::export_config_params(const RadarSystemParams& system,
     }
 }
 
-bool DataExporter::export_echo_iq_dat(const std::vector<CpiEcho>& cpi_echos,
-                                       int scan_index) {
-    std::string filepath = config_.output_dir + "/echo_iq_scan_" + std::to_string(scan_index) + ".dat";
+bool DataExporter::export_echo_iq_dat(const ScanEcho& scan_echo) {
+    const std::string filepath = config_.output_dir + "/echo_iq_scan_" + std::to_string(scan_echo.scan_index) + ".dat";
 
     try {
         std::ofstream file(filepath, std::ios::binary);
@@ -134,32 +164,27 @@ bool DataExporter::export_echo_iq_dat(const std::vector<CpiEcho>& cpi_echos,
             return false;
         }
 
-        // 文件头：[magic(4)] [version(4)] [scan_index(4)] [cpi_count(4)]
-        //        [pulses_per_cpi(4)] [samples_per_pulse(4)] [reserved(8)]
-        const uint32_t magic = 0x4543484F;  // "ECHO"
-        const uint32_t version = 1;
-        const uint32_t cpi_count = static_cast<uint32_t>(cpi_echos.size());
-        const uint32_t pulses_per_cpi = cpi_echos.empty() ? 0 : static_cast<uint32_t>(cpi_echos[0].pulses.size());
-        const uint32_t samples_per_pulse = cpi_echos.empty() || cpi_echos[0].pulses.empty() ? 0 : static_cast<uint32_t>(cpi_echos[0].pulses[0].size());
+        const uint32_t magic = 0x4543484F;
+        const uint32_t version = 2;
+        const uint32_t scan_index = static_cast<uint32_t>(scan_echo.scan_index);
+        const uint32_t pulse_count = static_cast<uint32_t>(scan_echo.pulse_results.size());
+        const uint32_t samples_per_pulse =
+            scan_echo.pulse_results.empty() ? 0U : static_cast<uint32_t>(scan_echo.pulse_results.front().echo.size());
         const uint64_t reserved = 0;
 
         file.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
         file.write(reinterpret_cast<const char*>(&version), sizeof(version));
         file.write(reinterpret_cast<const char*>(&scan_index), sizeof(scan_index));
-        file.write(reinterpret_cast<const char*>(&cpi_count), sizeof(cpi_count));
-        file.write(reinterpret_cast<const char*>(&pulses_per_cpi), sizeof(pulses_per_cpi));
+        file.write(reinterpret_cast<const char*>(&pulse_count), sizeof(pulse_count));
         file.write(reinterpret_cast<const char*>(&samples_per_pulse), sizeof(samples_per_pulse));
         file.write(reinterpret_cast<const char*>(&reserved), sizeof(reserved));
 
-        // 写入每个 CPI 的 IQ 数据 (float32 复数：real, imag 交替)
-        for (const auto& cpi : cpi_echos) {
-            for (const auto& pulse : cpi.pulses) {
-                for (const auto& sample : pulse) {
-                    float real = static_cast<float>(sample.real());
-                    float imag = static_cast<float>(sample.imag());
-                    file.write(reinterpret_cast<const char*>(&real), sizeof(real));
-                    file.write(reinterpret_cast<const char*>(&imag), sizeof(imag));
-                }
+        for (const auto& pulse_result : scan_echo.pulse_results) {
+            for (const auto& sample : pulse_result.echo) {
+                float real = static_cast<float>(sample.real());
+                float imag = static_cast<float>(sample.imag());
+                file.write(reinterpret_cast<const char*>(&real), sizeof(real));
+                file.write(reinterpret_cast<const char*>(&imag), sizeof(imag));
             }
         }
 
@@ -171,9 +196,25 @@ bool DataExporter::export_echo_iq_dat(const std::vector<CpiEcho>& cpi_echos,
     }
 }
 
+bool DataExporter::export_pulse_metadata_csv(const ScanEcho& scan_echo) {
+    const std::string filepath = config_.output_dir + "/echo_iq_scan_" + std::to_string(scan_echo.scan_index) + "_metadata.csv";
+    std::vector<std::vector<std::string>> rows;
+    rows.reserve(scan_echo.pulse_results.size());
+
+    for (const auto& pulse_result : scan_echo.pulse_results) {
+        rows.push_back({
+            std::to_string(pulse_result.pulse_index),
+            std::to_string(pulse_result.azimuth_deg),
+            std::to_string(pulse_result.elevation_deg)
+        });
+    }
+
+    return write_csv_file(filepath, {"pulse_index", "azimuth_deg", "elevation_deg"}, rows);
+}
+
 bool DataExporter::write_csv_file(const std::string& filepath,
-                                   const std::vector<std::string>& headers,
-                                   const std::vector<std::vector<std::string>>& rows) {
+                                  const std::vector<std::string>& headers,
+                                  const std::vector<std::vector<std::string>>& rows) {
     try {
         std::ofstream file(filepath);
         if (!file.is_open()) {
@@ -181,14 +222,12 @@ bool DataExporter::write_csv_file(const std::string& filepath,
             return false;
         }
 
-        // 写入表头
         for (std::size_t i = 0; i < headers.size(); ++i) {
             file << headers[i];
             if (i < headers.size() - 1) file << ",";
         }
         file << "\n";
 
-        // 写入数据行
         for (const auto& row : rows) {
             for (std::size_t i = 0; i < row.size(); ++i) {
                 file << row[i];
@@ -205,12 +244,10 @@ bool DataExporter::write_csv_file(const std::string& filepath,
     }
 }
 
-
-
-// 导出复数数据为CSV
 bool DataExporter::export_complex_csv(const std::string& filepath,
-                        const ComplexVec& data,
-                        const std::string& var_name) {
+                                      const ComplexVec& data,
+                                      const std::string& var_name) {
+    (void)var_name;
     std::ofstream file(filepath);
     if (!file.is_open()) {
         last_error_ = "Failed to open file: " + filepath;
@@ -227,10 +264,10 @@ bool DataExporter::export_complex_csv(const std::string& filepath,
     return true;
 }
 
-// 导出实数数据为CSV
 bool DataExporter::export_scalar_csv(const std::string& filepath,
-                       const std::vector<Scalar>& data,
-                       const std::string& var_name) {
+                                     const std::vector<Scalar>& data,
+                                     const std::string& var_name) {
+    (void)var_name;
     std::ofstream file(filepath);
     if (!file.is_open()) {
         last_error_ = "Failed to open file: " + filepath;
@@ -246,4 +283,5 @@ bool DataExporter::export_scalar_csv(const std::string& filepath,
 
     return true;
 }
+
 }  // namespace radar::core

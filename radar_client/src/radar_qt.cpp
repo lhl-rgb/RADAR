@@ -69,6 +69,7 @@ public:
     create_system_params(config_layout);
     create_waveform_params(config_layout);
     create_antenna_params(config_layout);
+    create_mech_scan_params(config_layout);
     create_noise_params(config_layout);
     create_clutter_params(config_layout);
     create_target_params(config_layout);
@@ -129,6 +130,8 @@ private slots:
     if (!send_waveform_params())
       return;
     if (!send_antenna_params())
+      return;
+    if (!send_mech_scan_params())
       return;
     if (!send_noise_params())
       return;
@@ -344,6 +347,13 @@ private:
     sys_scan_count_->setValue(10);
     layout->addRow("仿真扫描圈数:", sys_scan_count_);
 
+    sys_peak_power_ = new QDoubleSpinBox(this);
+    sys_peak_power_->setRange(1, 1e6);
+    sys_peak_power_->setDecimals(0);
+    sys_peak_power_->setValue(5000);
+    sys_peak_power_->setSuffix(" W");
+    layout->addRow("峰值发射功率:", sys_peak_power_);
+
     parent->addWidget(group);
   }
 
@@ -387,52 +397,64 @@ private:
   }
 
   void create_antenna_params(QVBoxLayout *parent) {
-    auto *group = new QGroupBox("天线参数", this);
+    auto *group = new QGroupBox("天线参数（反射面）", this);
     auto *layout = new QFormLayout(group);
 
-    ant_type_ = new QComboBox(this);
-    ant_type_->addItem("各向同性", 0);
-    ant_type_->addItem("抛物面", 1);
-    ant_type_->addItem("平面阵列", 2);
-    ant_type_->addItem("自定义方向图", 3);
-    layout->addRow("天线模型:", ant_type_);
+    ant_az_beamwidth_ = new QDoubleSpinBox(this);
+    ant_az_beamwidth_->setRange(0.1, 180.0);
+    ant_az_beamwidth_->setDecimals(1);
+    ant_az_beamwidth_->setValue(5.0);
+    ant_az_beamwidth_->setSuffix(" °");
+    layout->addRow("方位波束宽度:", ant_az_beamwidth_);
 
-    ant_az_elements_ = new QSpinBox(this);
-    ant_az_elements_->setRange(1, 64);
-    ant_az_elements_->setValue(16);
-    layout->addRow("方位阵元数:", ant_az_elements_);
-
-    ant_el_elements_ = new QSpinBox(this);
-    ant_el_elements_->setRange(1, 32);
-    ant_el_elements_->setValue(8);
-    layout->addRow("俯仰阵元数:", ant_el_elements_);
+    ant_el_beamwidth_ = new QDoubleSpinBox(this);
+    ant_el_beamwidth_->setRange(0.1, 180.0);
+    ant_el_beamwidth_->setDecimals(1);
+    ant_el_beamwidth_->setValue(5.0);
+    ant_el_beamwidth_->setSuffix(" °");
+    layout->addRow("俯仰波束宽度:", ant_el_beamwidth_);
 
     ant_gain_ = new QDoubleSpinBox(this);
     ant_gain_->setRange(20, 50);
     ant_gain_->setDecimals(1);
-    ant_gain_->setValue(36.0);
+    ant_gain_->setValue(35.0);
     ant_gain_->setSuffix(" dB");
     layout->addRow("峰值增益:", ant_gain_);
 
-    ant_bw_az_ = new QDoubleSpinBox(this);
-    ant_bw_az_->setRange(1, 180);
-    ant_bw_az_->setDecimals(1);
-    ant_bw_az_->setValue(3.0);
-    ant_bw_az_->setSuffix(" °");
-    layout->addRow("方位波束宽度:", ant_bw_az_);
+    parent->addWidget(group);
+  }
 
-    ant_bw_el_ = new QDoubleSpinBox(this);
-    ant_bw_el_->setRange(1, 180);
-    ant_bw_el_->setDecimals(1);
-    ant_bw_el_->setValue(3.0);
-    ant_bw_el_->setSuffix(" °");
-    layout->addRow("俯仰波束宽度:", ant_bw_el_);
+  void create_mech_scan_params(QVBoxLayout *parent) {
+    auto *group = new QGroupBox("机械扫描参数", this);
+    auto *layout = new QFormLayout(group);
 
-    ant_efficiency_ = new QDoubleSpinBox(this);
-    ant_efficiency_->setRange(0.1, 1.0);
-    ant_efficiency_->setDecimals(2);
-    ant_efficiency_->setValue(0.8);
-    layout->addRow("天线效率:", ant_efficiency_);
+    mech_rotation_rate_ = new QDoubleSpinBox(this);
+    mech_rotation_rate_->setRange(1, 360);
+    mech_rotation_rate_->setDecimals(1);
+    mech_rotation_rate_->setValue(60.0);
+    mech_rotation_rate_->setSuffix(" °/s");
+    layout->addRow("天线转速:", mech_rotation_rate_);
+
+    mech_az_start_ = new QDoubleSpinBox(this);
+    mech_az_start_->setRange(0, 360);
+    mech_az_start_->setDecimals(1);
+    mech_az_start_->setValue(0.0);
+    mech_az_start_->setSuffix(" °");
+    layout->addRow("起始方位角:", mech_az_start_);
+
+    mech_az_end_ = new QDoubleSpinBox(this);
+    mech_az_end_->setRange(0, 360);
+    mech_az_end_->setDecimals(1);
+    mech_az_end_->setValue(360.0);
+    mech_az_end_->setSuffix(" °");
+    layout->addRow("终止方位角:", mech_az_end_);
+
+    mech_elevation_ = new QDoubleSpinBox(this);
+    mech_elevation_->setRange(-90, 90);
+    mech_elevation_->setDecimals(1);
+    mech_elevation_->setValue(0.0);
+    mech_elevation_->setSuffix(" °");
+    layout->addRow("固定俯仰角:", mech_elevation_);
 
     parent->addWidget(group);
   }
@@ -497,12 +519,6 @@ private:
     clt_sea_state_->setValue(3);
     layout->addRow("海态等级:", clt_sea_state_);
 
-    clt_k_shape_ = new QDoubleSpinBox(this);
-    clt_k_shape_->setRange(0.5, 50);
-    clt_k_shape_->setDecimals(1);
-    clt_k_shape_->setValue(5.0);
-    layout->addRow("K分布形状参数 ν:", clt_k_shape_);
-
     clt_doppler_center_ = new QDoubleSpinBox(this);
     clt_doppler_center_->setRange(-500, 500);
     clt_doppler_center_->setDecimals(1);
@@ -535,6 +551,78 @@ private:
     clt_seed_->setRange(0, 999999);
     clt_seed_->setValue(54321);
     layout->addRow("随机种子:", clt_seed_);
+
+    clt_az_patch_step_ = new QDoubleSpinBox(this);
+    clt_az_patch_step_->setRange(0.01, 5.0);
+    clt_az_patch_step_->setDecimals(2);
+    clt_az_patch_step_->setSingleStep(0.05);
+    clt_az_patch_step_->setValue(0.25);
+    clt_az_patch_step_->setSuffix(" deg");
+    layout->addRow("方位patch步长:", clt_az_patch_step_);
+
+    clt_active_gain_floor_ = new QDoubleSpinBox(this);
+    clt_active_gain_floor_->setRange(-120.0, -1.0);
+    clt_active_gain_floor_->setDecimals(1);
+    clt_active_gain_floor_->setSingleStep(5.0);
+    clt_active_gain_floor_->setValue(-40.0);
+    clt_active_gain_floor_->setSuffix(" dB");
+    layout->addRow("活动窗口门限:", clt_active_gain_floor_);
+
+    clt_distribution_ = new QComboBox(this);
+    clt_distribution_->addItem("瑞利/复高斯", 0);
+    clt_distribution_->addItem("韦布尔", 1);
+    clt_distribution_->addItem("对数正态", 2);
+    clt_distribution_->addItem("K分布", 3);
+    layout->addRow("杂波分布:", clt_distribution_);
+
+    clt_weibull_shape_ = new QDoubleSpinBox(this);
+    clt_weibull_shape_->setRange(0.1, 20.0);
+    clt_weibull_shape_->setDecimals(2);
+    clt_weibull_shape_->setSingleStep(0.1);
+    clt_weibull_shape_->setValue(2.0);
+    layout->addRow("Weibull p:", clt_weibull_shape_);
+
+    clt_weibull_scale_ = new QDoubleSpinBox(this);
+    clt_weibull_scale_->setRange(0.01, 100.0);
+    clt_weibull_scale_->setDecimals(3);
+    clt_weibull_scale_->setSingleStep(0.1);
+    clt_weibull_scale_->setValue(1.414);
+    layout->addRow("Weibull q:", clt_weibull_scale_);
+
+    clt_lognormal_mu_ = new QDoubleSpinBox(this);
+    clt_lognormal_mu_->setRange(-20.0, 20.0);
+    clt_lognormal_mu_->setDecimals(3);
+    clt_lognormal_mu_->setSingleStep(0.1);
+    clt_lognormal_mu_->setValue(-1.0);
+    layout->addRow("LogNormal mu:", clt_lognormal_mu_);
+
+    clt_lognormal_sigma_ = new QDoubleSpinBox(this);
+    clt_lognormal_sigma_->setRange(0.0, 10.0);
+    clt_lognormal_sigma_->setDecimals(3);
+    clt_lognormal_sigma_->setSingleStep(0.1);
+    clt_lognormal_sigma_->setValue(1.0);
+    layout->addRow("LogNormal sigma:", clt_lognormal_sigma_);
+
+    clt_k_shape_nu_ = new QDoubleSpinBox(this);
+    clt_k_shape_nu_->setRange(0.05, 100.0);
+    clt_k_shape_nu_->setDecimals(3);
+    clt_k_shape_nu_->setSingleStep(0.1);
+    clt_k_shape_nu_->setValue(1.0);
+    layout->addRow("K nu:", clt_k_shape_nu_);
+
+    clt_k_texture_bandwidth_ = new QDoubleSpinBox(this);
+    clt_k_texture_bandwidth_->setRange(0.01, 100.0);
+    clt_k_texture_bandwidth_->setDecimals(3);
+    clt_k_texture_bandwidth_->setSingleStep(0.5);
+    clt_k_texture_bandwidth_->setValue(2.0);
+    clt_k_texture_bandwidth_->setSuffix(" Hz");
+    layout->addRow("K texture BW:", clt_k_texture_bandwidth_);
+
+    clt_k_lut_size_ = new QSpinBox(this);
+    clt_k_lut_size_->setRange(16, 65536);
+    clt_k_lut_size_->setSingleStep(1024);
+    clt_k_lut_size_->setValue(4096);
+    layout->addRow("K LUT size:", clt_k_lut_size_);
 
     parent->addWidget(group);
   }
@@ -628,6 +716,7 @@ private:
     request.set_min_range_m(sys_min_range_->value() * 1000);
     request.set_max_range_m(sys_max_range_->value() * 1000);
     request.set_scan_count(sys_scan_count_->value());
+    request.set_peak_power_w(sys_peak_power_->value());
 
     radar::Status reply;
     grpc::ClientContext ctx;
@@ -677,10 +766,8 @@ private:
 
   bool send_antenna_params() {
     radar::AntennaParams request;
-    request.set_model_type(static_cast<radar::AntennaParams::AntennaModelType>(
-        ant_type_->currentData().toInt()));
-    request.set_num_elements_az(ant_az_elements_->value());
-    request.set_num_elements_el(ant_el_elements_->value());
+    request.set_az_beamwidth_deg(ant_az_beamwidth_->value());
+    request.set_el_beamwidth_deg(ant_el_beamwidth_->value());
     request.set_peak_gain_db(ant_gain_->value());
 
     radar::Status reply;
@@ -695,6 +782,32 @@ private:
 
     if (!reply.success()) {
       QMessageBox::warning(this, "天线参数错误",
+                           QString::fromStdString(reply.message()));
+      return false;
+    }
+
+    return true;
+  }
+
+  bool send_mech_scan_params() {
+    radar::MechScanParams request;
+    request.set_rotation_rate_dps(mech_rotation_rate_->value());
+    request.set_az_start_deg(mech_az_start_->value());
+    request.set_az_end_deg(mech_az_end_->value());
+    request.set_elevation_deg(mech_elevation_->value());
+
+    radar::Status reply;
+    grpc::ClientContext ctx;
+    auto status = stub_->SetMechScanParams(&ctx, request, &reply);
+
+    if (!status.ok()) {
+      QMessageBox::critical(this, "gRPC错误",
+                            QString::fromStdString(status.error_message()));
+      return false;
+    }
+
+    if (!reply.success()) {
+      QMessageBox::warning(this, "扫描参数错误",
                            QString::fromStdString(reply.message()));
       return false;
     }
@@ -734,13 +847,23 @@ private:
   bool send_clutter_params() {
     radar::ClutterParams request;
     request.set_enabled(clt_enabled_->currentData().toInt() == 1);
-    request.set_k_shape_nu(clt_k_shape_->value());
-    request.set_morchin_sea_state(clt_sea_state_->value());
+    request.set_sea_state(clt_sea_state_->value());
     request.set_doppler_center_hz(clt_doppler_center_->value());
     request.set_doppler_sigma_hz(clt_doppler_spread_->value());
     request.set_ground_range_min_m(clt_range_min_->value() * 1000);
     request.set_ground_range_max_m(clt_range_max_->value() * 1000);
     request.set_seed(clt_seed_->value());
+    request.set_az_patch_step_deg(clt_az_patch_step_->value());
+    request.set_active_gain_floor_db(clt_active_gain_floor_->value());
+    request.set_distribution(static_cast<radar::ClutterParams::ClutterDistribution>(
+        clt_distribution_->currentData().toInt()));
+    request.set_weibull_shape(clt_weibull_shape_->value());
+    request.set_weibull_scale(clt_weibull_scale_->value());
+    request.set_lognormal_mu(clt_lognormal_mu_->value());
+    request.set_lognormal_sigma(clt_lognormal_sigma_->value());
+    request.set_k_shape_nu(clt_k_shape_nu_->value());
+    request.set_k_texture_bandwidth_hz(clt_k_texture_bandwidth_->value());
+    request.set_k_lut_size(clt_k_lut_size_->value());
 
     radar::Status reply;
     grpc::ClientContext ctx;
@@ -813,6 +936,7 @@ private:
   QDoubleSpinBox *sys_min_range_;
   QDoubleSpinBox *sys_max_range_;
   QSpinBox *sys_scan_count_;
+  QDoubleSpinBox *sys_peak_power_;
 
   QComboBox *wf_type_;
   QSpinBox *wf_code_length_;
@@ -820,13 +944,14 @@ private:
   QComboBox *wf_nlfm_window_;
   QComboBox *wf_polarization_;
 
-  QComboBox *ant_type_;
-  QSpinBox *ant_az_elements_;
-  QSpinBox *ant_el_elements_;
+  QDoubleSpinBox *ant_az_beamwidth_;
+  QDoubleSpinBox *ant_el_beamwidth_;
   QDoubleSpinBox *ant_gain_;
-  QDoubleSpinBox *ant_bw_az_;
-  QDoubleSpinBox *ant_bw_el_;
-  QDoubleSpinBox *ant_efficiency_;
+
+  QDoubleSpinBox *mech_rotation_rate_;
+  QDoubleSpinBox *mech_az_start_;
+  QDoubleSpinBox *mech_az_end_;
+  QDoubleSpinBox *mech_elevation_;
 
   QComboBox *noise_mode_;
   QDoubleSpinBox *noise_sigma_;
@@ -837,12 +962,21 @@ private:
 
   QComboBox *clt_enabled_;
   QSpinBox *clt_sea_state_;
-  QDoubleSpinBox *clt_k_shape_;
   QDoubleSpinBox *clt_doppler_center_;
   QDoubleSpinBox *clt_doppler_spread_;
   QDoubleSpinBox *clt_range_min_;
   QDoubleSpinBox *clt_range_max_;
   QSpinBox *clt_seed_;
+  QDoubleSpinBox *clt_az_patch_step_;
+  QDoubleSpinBox *clt_active_gain_floor_;
+  QComboBox *clt_distribution_;
+  QDoubleSpinBox *clt_weibull_shape_;
+  QDoubleSpinBox *clt_weibull_scale_;
+  QDoubleSpinBox *clt_lognormal_mu_;
+  QDoubleSpinBox *clt_lognormal_sigma_;
+  QDoubleSpinBox *clt_k_shape_nu_;
+  QDoubleSpinBox *clt_k_texture_bandwidth_;
+  QSpinBox *clt_k_lut_size_;
 
   QDoubleSpinBox *target_range_;
   QDoubleSpinBox *target_azimuth_;

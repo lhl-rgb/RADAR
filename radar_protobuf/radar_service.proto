@@ -12,6 +12,9 @@ service RadarService {
     rpc SetAntennaParams(AntennaParams) returns (Status);
     rpc GetAntennaParams(Empty) returns (AntennaParams);
 
+    rpc SetMechScanParams(MechScanParams) returns (Status);
+    rpc GetMechScanParams(Empty) returns (MechScanParams);
+
     rpc SetNoiseParams(NoiseParams) returns (Status);
     rpc GetNoiseParams(Empty) returns (NoiseParams);
 
@@ -27,6 +30,10 @@ service RadarService {
     rpc StartSimulation(Empty) returns (Status);
     rpc StopSimulation(Empty) returns (Status);
     rpc GetStatus(Empty) returns (SimStatus);
+    rpc GetMetrics(Empty) returns (SimMetrics);
+    rpc StreamMetrics(Empty) returns (stream SimMetrics);
+    rpc StreamRangeProfile(Empty) returns (stream RangeProfilePreviewMsg);
+    rpc StreamPpiPreview(Empty) returns (stream PpiPreviewMsg);
 }
 
 message Empty {}
@@ -58,6 +65,37 @@ message SimStatus {
     int32 total_scans = 4;
 }
 
+message SimMetrics {
+    uint32 current_scan = 1;
+    uint64 current_pulse = 2;
+    uint64 total_pulses = 3;
+    double progress_percent = 4;
+    double avg_us_per_prt = 5;
+    double realtime_ratio = 6;
+    double target_us = 7;
+    double clutter_us = 8;
+    double noise_us = 9;
+    double compose_us = 10;
+    double output_us = 11;
+    double preview_us = 12;
+    uint64 frames_output = 13;
+    uint64 dropped_preview_frames = 14;
+}
+
+message RangeProfilePreviewMsg {
+    uint64 pulse_index = 1;
+    double beam_az_deg = 2;
+    repeated float power_db = 3;
+}
+
+message PpiPreviewMsg {
+    uint32 scan_index = 1;
+    int32 range_bins = 2;
+    int32 az_bins = 3;
+    double dynamic_range_db = 4;
+    bytes image = 5;
+}
+
 message SystemParams {
     double fc_hz = 1;
     double prf_hz = 2;
@@ -67,6 +105,7 @@ message SystemParams {
     double min_range_m = 6;
     double max_range_m = 7;
     int32 scan_count = 8;
+    double peak_power_w = 9;
 }
 
 message WaveformParams {
@@ -83,16 +122,16 @@ message WaveformParams {
 }
 
 message AntennaParams {
-    enum AntennaModelType {
-        ISOTROPIC = 0;
-        PARABOLIC = 1;
-        PLANAR_ARRAY = 2;
-        USER_PATTERN = 3;
-    }
-    AntennaModelType model_type = 1;
-    int32 num_elements_az = 2;
-    int32 num_elements_el = 3;
-    double peak_gain_db = 4;
+    double az_beamwidth_deg = 1;  // 方位维 3dB 波束宽度（度）
+    double el_beamwidth_deg = 2;  // 俯仰维 3dB 波束宽度（度）
+    double peak_gain_db = 3;      // 峰值增益（dB）
+}
+
+message MechScanParams {
+    double rotation_rate_dps = 1;  // 天线转速（度/秒）
+    double az_start_deg = 2;       // 有效扫描起始方位角（度）
+    double az_end_deg = 3;         // 有效扫描终止方位角（度）
+    double elevation_deg = 4;      // 固定俯仰角（度）
 }
 
 message NoiseParams {
@@ -110,15 +149,31 @@ message NoiseParams {
     int32 seed = 6;
 }
 
+// 杂波地图参数
 message ClutterParams {
+    enum ClutterDistribution {
+        RAYLEIGH = 0;
+        WEIBULL = 1;
+        LOG_NORMAL = 2;
+        K_DISTRIBUTION = 3;
+    }
     bool enabled = 1;
-    double k_shape_nu = 2;
-    double morchin_sea_state = 3;
-    double doppler_center_hz = 4;
-    double doppler_sigma_hz = 5;
-    double ground_range_min_m = 6;
-    double ground_range_max_m = 7;
-    int32 seed = 8;
+    double sea_state = 2;        // 海况等级
+    double doppler_center_hz = 3;        // 多普勒谱中心（Hz）
+    double doppler_sigma_hz = 4;         // 多普勒谱标准差（Hz）
+    double ground_range_min_m = 5;       // 地距下限（m）
+    double ground_range_max_m = 6;       // 地距上限（m）
+    int32 seed = 7;                      // 随机种子
+    double az_patch_step_deg = 8;        // 海面方位 patch 网格步长（度）
+    double active_gain_floor_db = 9;     // 活动窗口截断门限（相对峰值功率 dB）
+    ClutterDistribution distribution = 10; // 幅度分布
+    double weibull_shape = 11;           // Weibull 形状参数 p
+    double weibull_scale = 12;           // Weibull 尺度参数 q
+    double lognormal_mu = 13;            // ln(幅度) 均值
+    double lognormal_sigma = 14;         // ln(幅度) 标准差
+    double k_shape_nu = 15;              // K 分布 Gamma texture 形状参数
+    double k_texture_bandwidth_hz = 16;  // K 分布 texture AR(1) 带宽
+    int32 k_lut_size = 17;               // K 分布 z->sqrt(tau) LUT 长度
 }
 
 message TargetParams {

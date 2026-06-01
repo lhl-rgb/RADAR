@@ -14,8 +14,6 @@
 
 namespace radar::core {
 
-// Using declarations for types from parent namespace
-using radar::CpiEcho;
 using radar::RadarSystemParams;
 using radar::ScalarVector;
 
@@ -109,74 +107,6 @@ void UdpSender::shutdown() {
         socket_ = -1;
     }
     initialized_ = false;
-}
-
-bool UdpSender::send_cpi(const CpiEcho& cpi_echo,
-                         int scan_index,
-                         int cpi_index,
-                         const RadarSystemParams& system) {
-    if (!initialized_) {
-        last_error_ = "UdpSender not initialized";
-        return false;
-    }
-
-    if (cpi_echo.pulses.empty()) {
-        last_error_ = "Empty CPI echo";
-        return false;
-    }
-
-    uint32_t pulse_count = static_cast<uint32_t>(cpi_echo.pulses.size());
-    uint32_t sample_count = static_cast<uint32_t>(cpi_echo.pulses.empty() ? 0 : cpi_echo.pulses[0].size());
-    // 准备头部
-    UdpPacketHeader header;
-    header.sequence_id = htonl(sequence_counter_);
-    header.scan_index = htonl(static_cast<uint32_t>(scan_index));
-    header.cpi_index = htonl(static_cast<uint32_t>(cpi_index));
-    header.beam_index = htonl(static_cast<uint32_t>(cpi_echo.beam_index));
-    header.pulse_count = htonl(pulse_count);
-    header.sample_count = htonl(sample_count);
-
-    // 计算时间戳 (跳过实际时间获取，使用 0 或者模拟时间戳)
-    header.timestamp_us = 0;
-
-    header.checksum = 0;  // 先置 0
-
-    // 序列化 IQ 数据（float32 实部 + 虚部交替）
-    ScalarVector iq_data;
-    const size_t total_samples = pulse_count * sample_count;
-    iq_data.reserve(total_samples * sizeof(Scalar)); 
-
-    for (const auto& pulse : cpi_echo.pulses) {
-        for (const auto& sample : pulse) {
-            iq_data.push_back(static_cast<Scalar>(sample.real()));
-            iq_data.push_back(static_cast<Scalar>(sample.imag()));
-        }
-    }
-
-    // 计算头部校验和
-    const size_t header_size = sizeof(UdpPacketHeader);
-    std::vector<uint8_t> packet_buffer(header_size + iq_data.size() * sizeof(float));
-
-    // 计算头部校验和
-    uint32_t checksum = compute_checksum(packet_buffer.data(), header_size);
-
-    // 填入校验和（主机序转网络序）
-    header.checksum = htonl(checksum);
-    std::memcpy(packet_buffer.data(), &header, header_size);
-
-    // 复制 IQ 数据
-    if (!iq_data.empty()) {
-        std::memcpy(packet_buffer.data() + header_size, iq_data.data(),
-                    iq_data.size() * sizeof(float));
-    }
-
-    // 发送数据包
-    if (!send_packet(packet_buffer.data(), packet_buffer.size())) {
-        return false;
-    }
-
-    sequence_counter_++;
-    return true;
 }
 
 bool UdpSender::send_packet(const uint8_t* data, size_t size) {

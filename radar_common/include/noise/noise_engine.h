@@ -27,156 +27,171 @@
 #include <random>
 #include <string>
 
-namespace radar::noise {
-
-/**
- * @brief 复高斯白噪声生成引擎
- */
-class NoiseEngine {
-public:
-    NoiseEngine() = default;
-    ~NoiseEngine() = default;
-
-    // 禁止拷贝
-    NoiseEngine(const NoiseEngine&) = delete;
-    NoiseEngine& operator=(const NoiseEngine&) = delete;
-
-    // ========================================================================
-    // 配置注入
-    // ========================================================================
+namespace radar::noise
+{
 
     /**
-     * @brief 设置噪声配置
-     * @param cfg 噪声配置参数
+     * @brief 复高斯白噪声生成引擎
      */
-    void set_config(const noise::NoiseConfig& cfg) { cfg_ = cfg; }
+    class NoiseEngine
+    {
+    public:
+        NoiseEngine() = default;
+        ~NoiseEngine() = default;
 
-    /**
-     * @brief 设置系统参数
-     * @param sys 雷达系统参数
-     */
-    void set_system_params(const RadarSystemParams& sys) { sys_ = sys; }
+        // 禁止拷贝
+        NoiseEngine(const NoiseEngine &) = delete;
+        NoiseEngine &operator=(const NoiseEngine &) = delete;
 
-    // ========================================================================
-    // 初始化
-    // ========================================================================
+        // ========================================================================
+        // 配置注入
+        // ========================================================================
 
-    /**
-     * @brief 初始化噪声引擎
-     * @return 如果初始化成功返回 true
-     *
-     * 验证配置参数并计算噪声功率、I/Q 标准差等缓存值。
-     */
-    bool initialize();
+        /**
+         * @brief 设置噪声配置
+         * @param cfg 噪声配置参数
+         */
+        void set_config(const noise::NoiseConfig &cfg) { cfg_ = cfg; }
 
-    /**
-     * @brief 检查是否已初始化
-     */
-    bool is_initialized() const { return initialized_; }
+        /**
+         * @brief 设置系统参数
+         * @param sys 雷达系统参数
+         */
+        void set_system_params(const RadarSystemParams &sys) { sys_ = sys; }
 
-    /**
-     * @brief 获取最近一次错误信息
-     */
-    const std::string& last_error() const { return last_error_; }
+        // ========================================================================
+        // 初始化
+        // ========================================================================
 
-    // ========================================================================
-    // 运行时控制
-    // ========================================================================
+        /**
+         * @brief 初始化噪声引擎
+         * @return 如果初始化成功返回 true
+         *
+         * 验证配置参数并计算噪声功率、I/Q 标准差等缓存值。
+         */
+        bool initialize();
 
-    /**
-     * @brief 重置随机种子
-     * @param seed 新的随机种子
-     */
-    void reseed(uint64_t seed);
+        /**
+         * @brief 检查是否已初始化
+         */
+        bool is_initialized() const { return initialized_; }
 
-    // ========================================================================
-    // 核心功能
-    // ========================================================================
+        /**
+         * @brief 获取最近一次错误信息
+         */
+        const std::string &last_error() const { return last_error_; }
 
-    /**
-     * @brief 生成一个复高斯白噪声样本
-     * @return 复噪声样本
-     */
-    Complex sample();
+        // ========================================================================
+        // 运行时控制
+        // ========================================================================
 
-    /**
-     * @brief 生成长度为 n 的复高斯白噪声序列
-     * @param n 样本数量
-     * @return 复噪声向量
-     */
-    ComplexVec generate(std::size_t n);
+        /**
+         * @brief 重置随机种子
+         * @param seed 新的随机种子
+         */
+        void reseed(uint64_t seed);
 
-    /**
-     * @brief 对复信号原地加噪
-     * @param signal 输入输出信号（会被修改）
-     */
-    void add_noise(ComplexVec& signal);
+        // ========================================================================
+        // 核心功能
+        // ========================================================================
 
-    /**
-     * @brief 对 CPI 回波逐脉冲原地加噪
-     * @param cpi_echo 输入输出 CPI 回波（会被修改）
-     */
-    void add_noise(CpiEcho& cpi_echo);
+        /**
+         * @brief 生成一个复高斯白噪声样本
+         * @return 复噪声样本
+         */
+        Complex sample();
 
-    // ========================================================================
-    // 状态查询
-    // ========================================================================
+        /**
+         * @brief 生成长度为 n 的复高斯白噪声序列
+         * @param n 样本数量
+         * @return 复噪声向量
+         */
+        ComplexVec generate(std::size_t n);
 
-    /**
-     * @brief 获取当前配置
-     */
-    const noise::NoiseConfig& config() const { return cfg_; }
+        /**
+         * @brief 对复信号原地加噪
+         * @param signal 输入输出信号（会被修改）
+         */
+        void add_noise(ComplexVec &signal);
 
-    /**
-     * @brief 获取当前系统参数
-     */
-    const RadarSystemParams& system_params() const { return sys_; }
+        // ========================================================================
+        // 状态查询
+        // ========================================================================
 
-    /**
-     * @brief 获取当前复噪声功率 (W)
-     */
-    Scalar noise_power_w() const { return noise_power_w_; }
+        /**
+         * @brief 获取当前配置
+         */
+        const noise::NoiseConfig &config() const { return cfg_; }
 
-    /**
-     * @brief 获取当前复噪声总 RMS
-     */
-    Scalar noise_sigma() const { return sigma_complex_; }
+        /**
+         * @brief 获取当前系统参数
+         */
+        const RadarSystemParams &system_params() const { return sys_; }
 
-    /**
-     * @brief 获取当前 I/Q 单分量标准差
-     */
-    Scalar iq_sigma() const { return sigma_iq_; }
+        /**
+         * @brief 获取当前复噪声功率 (W)
+         */
+        Scalar noise_power_w() const { return noise_power_w_; }
 
-private:
-    static constexpr Scalar kBoltzmann = 1.380649e-23;
+        /**
+         * @brief 获取当前复噪声总 RMS
+         */
+        Scalar noise_sigma() const { return sigma_complex_; }
 
-    /**
-     * @brief 计算噪声功率
-     */
-    static bool compute_noise_power(const RadarSystemParams& sys,
-                                    const noise::NoiseConfig& cfg,
-                                    Scalar& out_noise_power_w,
-                                    std::string& error);
+        /**
+         * @brief 获取当前 I/Q 单分量标准差
+         */
+        Scalar iq_sigma() const { return sigma_iq_; }
 
-    /**
-     * @brief 构建缓存值（sigma_complex, sigma_iq）
-     */
-    static bool build_cache(Scalar noise_power_w,
-                            Scalar& out_sigma_complex,
-                            Scalar& out_sigma_iq,
-                            std::string& error);
+        /**
+         * @brief 当前是否使用 GPU 批量生成
+         */
+        bool using_gpu() const { return backend_ == ResolvedBackend::GPU; }
 
-    RadarSystemParams sys_;
-    noise::NoiseConfig cfg_;
-    std::mt19937_64 rng_;
-    std::normal_distribution<Scalar> standard_normal_;
+    private:
+        enum class ResolvedBackend
+        {
+            CPU,
+            GPU
+        };
 
-    Scalar noise_power_w_ = 1.0e-6;
-    Scalar sigma_complex_ = 1.0e-3;
-    Scalar sigma_iq_ = 7.071067811865476e-4;
+        static constexpr Scalar kBoltzmann = 1.380649e-23;
 
-    bool initialized_ = false;
-    std::string last_error_;
-};
+        /**
+         * @brief 计算噪声功率
+         */
+        static bool compute_noise_power(const RadarSystemParams &sys,
+                                        const noise::NoiseConfig &cfg,
+                                        Scalar &out_noise_power_w,
+                                        std::string &error);
+
+        /**
+         * @brief 构建缓存值（sigma_complex, sigma_iq）
+         */
+        static bool build_cache(Scalar noise_power_w,
+                                Scalar &out_sigma_complex,
+                                Scalar &out_sigma_iq,
+                                std::string &error);
+
+        void reset_sequence_state(uint64_t seed);
+        void resolve_backend();
+        ComplexVec generate_cpu(std::size_t n);
+        bool should_use_gpu(std::size_t n) const;
+
+        RadarSystemParams sys_;
+        noise::NoiseConfig cfg_;
+        std::mt19937_64 rng_;
+        std::normal_distribution<Scalar> standard_normal_;
+
+        Scalar noise_power_w_ = 1.0e-6;
+        Scalar sigma_complex_ = 1.0e-3;
+        Scalar sigma_iq_ = 7.071067811865476e-4;
+
+        ResolvedBackend backend_ = ResolvedBackend::CPU;
+        std::uint64_t sample_offset_ = 0;
+
+        bool initialized_ = false;
+        std::string last_error_;
+    };
 
 } // namespace radar::noise

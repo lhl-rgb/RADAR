@@ -6,7 +6,6 @@
 #pragma once
 
 #include <string>
-#include <nlohmann/json.hpp>
 
 namespace radar {
 
@@ -37,21 +36,6 @@ inline bool UdpConfig::validate(std::string& error) const {
         return false;
     }
     return true;
-}
-
-// JSON 序列化
-inline void from_json(const nlohmann::json& j, UdpConfig& cfg) {
-    if (j.contains("enabled")) j.at("enabled").get_to(cfg.enabled);
-    if (j.contains("target_ip")) j.at("target_ip").get_to(cfg.target_ip);
-    if (j.contains("target_port")) j.at("target_port").get_to(cfg.target_port);
-}
-
-inline void to_json(nlohmann::json& j, const UdpConfig& cfg) {
-    j = nlohmann::json{
-        {"enabled", cfg.enabled},
-        {"target_ip", cfg.target_ip},
-        {"target_port", cfg.target_port}
-    };
 }
 
 }  // namespace radar

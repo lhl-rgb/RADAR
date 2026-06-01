@@ -6,8 +6,9 @@
 #pragma once
 
 #include "antenna/antenna_model.h"
-#include "core/radar_system_params.h"
+#include "core/types.h"
 #include "target/target_config.h"
+
 #include <string>
 
 namespace radar::target {
@@ -15,13 +16,21 @@ namespace radar::target {
 using radar::antenna::AntennaModel;
 
 /**
- * @brief 波位视图
- * @details 包含波束指向角度、波位索引和天线指针
+ * @brief 波束视图
  */
 struct BeamView {
-    BeamPoint pointing{};                         ///< 波束指向（方位、仰角）
-    int beam_index = 0;                            ///< 波位索引
-    const AntennaModel* antenna = nullptr;  ///< 天线指针（用于获取增益等信息）
+    BeamPoint pointing{};
+    const AntennaModel* antenna = nullptr;
+};
+
+/**
+ * @brief 当前脉冲上下文
+ */
+struct PulseContext {
+    int scan_index = 0;
+    int pulse_index_in_scan = 0;
+    int global_pulse_index = 0;
+    Scalar current_time_s = 0.0;
 };
 
 /**
@@ -30,24 +39,14 @@ struct BeamView {
 class TargetKinematics {
 public:
     /**
-     * @brief 为目标生成一个CPI的完整真值轨迹
+     * @brief 为单个目标生成当前脉冲时刻的真值快照
      */
-    static bool generate_trajectory(const TargetState& target,
-                                    const BeamView& beam,
-                                    const RadarSystemParams& system,
-                                    const target::TargetConfig& config,
-                                    TargetTrajectory& out_trajectory,
-                                    std::string& error);
-
-    /**
-     * @brief 为多个目标批量生成一个CPI的完整真值轨迹
-     */
-    static bool generate_trajectories(const TargetList& targets,
-                                      const BeamView& beam,
-                                      const RadarSystemParams& system,
-                                      const target::TargetConfig& config,
-                                      TrajectoryBatch& out_trajectories,
-                                      std::string& error);
+    static bool generate_snapshot(const TargetState& target,
+                                  const BeamView& beam,
+                                  const PulseContext& pulse,
+                                  const target::TargetConfig& config,
+                                  TargetSnapshot& out_snapshot,
+                                  std::string& error);
 };
 
-}  // namespace radar
+}  // namespace radar::target
